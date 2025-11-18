@@ -94,9 +94,26 @@ If instructions conflict:
 2. Give two or three solutions  
 3. Wait for approval  
 
+
+## Git and GitHub Authentication
+
+The agent does not manage credentials.  
+Authentication is handled entirely by the local machine through SSH keys.
+
+The agent may safely run Git commands (pull, commit, push) without providing any passwords or tokens, because the environment already contains:
+
+- A configured Git user  
+- SSH keys loaded into the ssh-agent  
+- A GitHub remote using SSH  
+
+The agent must not attempt to create or modify credentials.
+
+
 ## Summary
 
 `AGENTS.md` defines how AI agents should collaborate in this repo.  
 Follow the structure, keep code clean, update progress, and propose improvements clearly.  
 
 Everything else: agents have full freedom to build and optimize the project.
+
+
