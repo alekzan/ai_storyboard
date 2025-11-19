@@ -312,6 +312,8 @@ Stored items:
   - JSON  
   - seeds  
 
+**NOTE:** If you **REALLY** need to use databases, you can use your MCP Supabase to create and store data. But keep it as last resort.
+
 ---
 
 # 11. Important Files
