@@ -24,6 +24,8 @@ Each step must be completed before moving to the next.
 - Create script_agent  
 - Validate structured outputs  
 
+**NOTE**: To streamline development and testing, the system will initially use a backend .env BRIA_API_TOKEN key so the entire pipeline can be built without interruptions. In the final stage of the MVP, the UI will require users to provide their own BRIA API key before generating images. This avoids blocking the build process, keeps iteration fast, and ensures the final product is compliant and ready for public use.
+
 ---
 
 ## 2. Core AI Pipeline
@@ -139,3 +141,15 @@ Each step must be completed before moving to the next.
 - Prepare sample outputs in various styles  
 - Create quick actions for the hackathon demo  
 - Verify refinement flow shows continuity  
+
+## 9. Final Integration: User API Key Input
+
+Before the final demo, add a simple UI and backend mechanism for users to supply their own BRIA API key.
+This should be implemented only after the full pipeline is working, so development and testing are not blocked.
+
+**Requirements:**
+
+- Add a small settings dialog or first-time modal where user pastes their BRIA API key
+- Store the key only in browser memory (session/local storage)
+- Pass this key to the backend for all FIBO calls
+- If no key is provided, disable image generation with a clear message
