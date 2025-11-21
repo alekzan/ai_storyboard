@@ -13,6 +13,7 @@ from ..agent_structured_outputs import (
     CharacterCastAgentOutput,
     CharacterInfo,
     ScriptAgentOutput,
+    ShotAgentDecision,
 )
 from ..settings import get_settings
 
@@ -78,3 +79,32 @@ def run_script_agent(script: str, characters: List[CharacterInfo]) -> ScriptAgen
         return ScriptAgentOutput.model_validate_json(json_payload)
     except Exception as exc:  # pylint: disable=broad-except
         raise RuntimeError(f"Unable to parse script agent output: {exc}") from exc
+
+
+def run_shot_agent(
+    *,
+    shot_description: str,
+    user_request: str,
+    previous_structured_prompt: dict,
+    seed: int,
+    characters_in_shot: List[str],
+) -> ShotAgentDecision:
+    schema = json.dumps(ShotAgentDecision.model_json_schema(), indent=2)
+    context = {
+        "shot_description": shot_description,
+        "seed": seed,
+        "characters_in_shot": characters_in_shot,
+        "previous_structured_prompt": previous_structured_prompt,
+        "user_request": user_request,
+    }
+    user_prompt = (
+        "Decide whether to refine or regenerate this shot. Respond ONLY with JSON matching the schema.\n"
+        f"Schema:\n{schema}\n\n"
+        f"Context:\n{json.dumps(context, indent=2)}"
+    )
+    content = _call_llm(shot_agent_prompt.strip(), user_prompt)
+    json_payload = _extract_json_block(content)
+    try:
+        return ShotAgentDecision.model_validate_json(json_payload)
+    except Exception as exc:  # pylint: disable=broad-except
+        raise RuntimeError(f"Unable to parse shot agent output: {exc}") from exc

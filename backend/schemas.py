@@ -67,3 +67,32 @@ class ShotGenerationRequest(BaseModel):
 class ShotGenerationResponse(BaseModel):
     session_id: str
     shots: List[ShotAsset]
+
+
+class ShotRefineRequest(BaseModel):
+    session_id: str
+    scene_number: int
+    shot_number: int
+    edit_prompt: str = Field(..., description="What to change in the shot.")
+    use_reference_images: bool = Field(
+        default=False,
+        description="Optionally pass character reference images to the refine call if identity drifted.",
+    )
+
+
+class ShotRefineResponse(BaseModel):
+    session_id: str
+    shot: ShotAsset
+
+
+class ShotEditRequest(BaseModel):
+    session_id: str
+    scene_number: int
+    shot_number: int
+    user_request: str = Field(..., description="Freeform user request to change the shot.")
+
+
+class ShotEditResponse(BaseModel):
+    session_id: str
+    decision: str
+    shot: ShotAsset

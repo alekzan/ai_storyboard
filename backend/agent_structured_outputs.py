@@ -38,3 +38,22 @@ class Scene(BaseModel):
 class ScriptAgentOutput(BaseModel):
     """Return all scenes and their shots derived from the story."""
     scenes: List[Scene] = Field(description="Ordered list of scenes containing structured shots.")
+
+
+#################################################
+############### FOR shot_agent ##################
+#################################################
+class ShotAgentDecision(BaseModel):
+    action: str = Field(description="Either 'refine' or 'generate'.")
+    edit_prompt: str | None = Field(
+        default=None,
+        description="Required when action is 'refine'. Concise change description.",
+    )
+    shot_description: str | None = Field(
+        default=None,
+        description="Required when action is 'generate'. Full shot description incorporating changes.",
+    )
+    use_reference_images: bool | None = Field(
+        default=None,
+        description="If true, include character reference images in the chosen call.",
+    )

@@ -14,5 +14,8 @@
 ## 2025-11-20
 
 - **Completed:** Added `/shots/generate` endpoint and service to iterate session scenes/shots, gather character reference images, call `generate_shot_with_refs`, and persist shot assets (image_url, seed, structured_prompt) in session storage.
-- **Needs Testing:** Run `POST /script` → `POST /characters/generate` → `POST /shots/generate` to verify shots generate per scene, style propagates, reference enforcement raises clear errors when a character image is missing, and shot assets persist across requests.
-- **Next:** Implement shot refinement/regeneration flow (shot_agent + `/shots/refine`), or begin frontend integration pages using the stored session assets.
+- **Completed:** Added `/shots/refine` endpoint to apply edit prompts against existing shots using `refine_shot_with_refs`, reusing stored structured_prompt and seed, with optional character references and session persistence.
+- **Needs Testing:** Run `POST /script` → `POST /characters/generate` → `POST /shots/generate` → `POST /shots/refine` to confirm refinement works, respects stored seeds/prompts, optional reference flag, and updates shot assets in session.
+- **Completed:** Implemented shot_agent-driven `/shots/edit` endpoint that decides regenerate vs refine based on user request, calls the appropriate Bria tool, and updates stored shot assets.
+- **Needs Testing:** Run `POST /script` → `POST /characters/generate` → `POST /shots/generate` → `POST /shots/edit` (with a user request) to confirm agent decisions, ensure references are enforced when requested, and verify shot assets persist with updated seeds/prompts.
+- **Next:** Start frontend integration (script input → characters → storyboard grid) or extend shot_agent logic for more granular regenerate cases; pick UI next if ready.

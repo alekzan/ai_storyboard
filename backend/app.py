@@ -11,8 +11,18 @@ from .schemas import (
     CharacterGenerationResponse,
     ShotGenerationRequest,
     ShotGenerationResponse,
+    ShotRefineRequest,
+    ShotRefineResponse,
+    ShotEditRequest,
+    ShotEditResponse,
 )
-from .services import ScriptIngestionService, CharacterGenerationService, ShotGenerationService
+from .services import (
+    ScriptIngestionService,
+    CharacterGenerationService,
+    ShotGenerationService,
+    ShotRefinementService,
+    ShotEditService,
+)
 
 
 def create_app() -> FastAPI:
@@ -27,6 +37,8 @@ def create_app() -> FastAPI:
     ingestion_service = ScriptIngestionService()
     character_generation_service = CharacterGenerationService()
     shot_generation_service = ShotGenerationService()
+    shot_refinement_service = ShotRefinementService()
+    shot_edit_service = ShotEditService()
 
     app.add_middleware(
         CORSMiddleware,
@@ -76,6 +88,24 @@ def create_app() -> FastAPI:
     )
     def generate_shots(payload: ShotGenerationRequest):
         return shot_generation_service.generate(payload)
+
+    @app.post(
+        "/shots/refine",
+        response_model=ShotRefineResponse,
+        tags=["pipeline"],
+        status_code=status.HTTP_201_CREATED,
+    )
+    def refine_shot(payload: ShotRefineRequest):
+        return shot_refinement_service.refine(payload)
+
+    @app.post(
+        "/shots/edit",
+        response_model=ShotEditResponse,
+        tags=["pipeline"],
+        status_code=status.HTTP_201_CREATED,
+    )
+    def edit_shot(payload: ShotEditRequest):
+        return shot_edit_service.edit(payload)
 
     return app
 
