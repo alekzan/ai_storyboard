@@ -36,5 +36,5 @@ def get_settings() -> Settings:
         environment=os.getenv("ENVIRONMENT", "local"),
         bria_api_token=os.getenv("BRIA_API_TOKEN"),
         openai_api_key=os.getenv("OPENAI_API_KEY"),
-        openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),
+        openai_model=os.getenv("OPENAI_MODEL", "gpt-5-nano-2025-08-07"),
     )

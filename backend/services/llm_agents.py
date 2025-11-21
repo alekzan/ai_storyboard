@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 import re
-from typing import List
+from typing import List, Any
 
 from openai import OpenAI
 
-from ..agent_prompts import character_cast_agent_prompt, script_agent_prompt
+from ..agent_prompts import character_cast_agent_prompt, script_agent_prompt, shot_agent_prompt
 from ..agent_structured_outputs import (
     CharacterCastAgentOutput,
     CharacterInfo,
@@ -25,18 +25,32 @@ def _get_client() -> OpenAI:
     return OpenAI(api_key=settings.openai_api_key)
 
 
+def _extract_output_text(resp: Any) -> str:
+    # Prefer the convenience property if present
+    if hasattr(resp, "output_text") and resp.output_text:
+        return resp.output_text
+
+    # Fallback: scan output array for message content with output_text entries
+    output = getattr(resp, "output", None) or []
+    for item in output:
+        if item.get("type") == "message":
+            for content in item.get("content", []):
+                if content.get("type") == "output_text":
+                    return content.get("text", "")
+    return ""
+
+
 def _call_llm(system_prompt: str, user_prompt: str) -> str:
     settings = get_settings()
     client = _get_client()
-    response = client.chat.completions.create(
+    response = client.responses.create(
         model=settings.openai_model,
-        temperature=0.2,
-        messages=[
+        input=[
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
     )
-    return response.choices[0].message.content or ""
+    return _extract_output_text(response)
 
 
 def _extract_json_block(text: str) -> str:

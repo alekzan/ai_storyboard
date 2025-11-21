@@ -18,4 +18,5 @@
 - **Needs Testing:** Run `POST /script` → `POST /characters/generate` → `POST /shots/generate` → `POST /shots/refine` to confirm refinement works, respects stored seeds/prompts, optional reference flag, and updates shot assets in session.
 - **Completed:** Implemented shot_agent-driven `/shots/edit` endpoint that decides regenerate vs refine based on user request, calls the appropriate Bria tool, and updates stored shot assets.
 - **Needs Testing:** Run `POST /script` → `POST /characters/generate` → `POST /shots/generate` → `POST /shots/edit` (with a user request) to confirm agent decisions, ensure references are enforced when requested, and verify shot assets persist with updated seeds/prompts.
+- **Completed:** Migrated all LLM calls to OpenAI Responses API with model `gpt-5-nano-2025-08-07`; fixed `shot_agent_prompt` import causing `/shots/edit` 500.
 - **Next:** Start frontend integration (script input → characters → storyboard grid) or extend shot_agent logic for more granular regenerate cases; pick UI next if ready.
