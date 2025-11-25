@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Storyboard Maker</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <h1>Storyboard Maker</h1>
+          <p>Script → Characters → Shots</p>
+        </div>
+      </div>
+      <div class="status">
+        <label for="backend-url">Backend URL</label>
+        <div class="status-row">
+          <input id="backend-url" type="text" value="http://localhost:8000" />
+          <button id="ping-backend" class="ghost">Ping</button>
+        </div>
+        <div id="health-status" class="pill pill-muted">idle</div>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Step 1</p>
+            <h2>Script & Style</h2>
+            <p class="muted">Paste a script, pick a style, and generate the scene + shot plan.</p>
+          </div>
+          <div class="session-pill" id="session-pill">No session yet</div>
+        </div>
+        <form id="script-form" class="grid two-cols">
+          <label class="stack">
+            <span>Script</span>
+            <textarea id="script-input" placeholder="Paste or type your story..."></textarea>
+          </label>
+          <div class="stack">
+            <label class="stack">
+              <span>Style</span>
+              <select id="style-select">
+                <option value="realistic">Realistic</option>
+                <option value="outline">Outline</option>
+                <option value="3d">3D</option>
+                <option value="anime">Anime</option>
+              </select>
+            </label>
+            <div class="stack">
+              <span class="muted">Quick start</span>
+              <p class="muted small">After ingest, we’ll show detected characters and scene/shot breakdown.</p>
+            </div>
+            <button type="submit" class="primary" id="ingest-btn">Ingest Script</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Step 2</p>
+            <h2>Characters</h2>
+            <p class="muted">Review detected characters. Generate visual references when ready.</p>
+          </div>
+          <div class="actions">
+            <button class="primary" id="generate-characters" disabled>Generate Characters</button>
+          </div>
+        </div>
+        <div id="character-list" class="grid three-cols empty-state">
+          <p class="muted">Run script ingestion to see characters.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Step 3</p>
+            <h2>Scenes & Shots</h2>
+            <p class="muted">Preview the plan from the script agent. Generate shots once characters are ready.</p>
+          </div>
+          <div class="actions">
+            <button class="primary" id="generate-shots" disabled>Generate Shots</button>
+          </div>
+        </div>
+        <div id="scene-list" class="stack gap-lg empty-state">
+          <p class="muted">Ingest a script to see scenes and shots.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="eyebrow">Step 4</p>
+            <h2>Storyboard Grid</h2>
+            <p class="muted">View generated shots and send quick edit requests. The agent will refine or regenerate.</p>
+          </div>
+        </div>
+        <div id="shot-grid" class="grid three-cols empty-state">
+          <p class="muted">Generate shots to see the storyboard.</p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p class="muted small">Keep your session open while iterating. Edits call /shots/edit so the agent decides refine vs regenerate.</p>
+    </footer>
+  </div>
+
+  <div id="toast" class="toast hidden"></div>
+  <script src="./app.js"></script>
+</body>
+</html>

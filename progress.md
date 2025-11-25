@@ -20,3 +20,11 @@
 - **Needs Testing:** Run `POST /script` → `POST /characters/generate` → `POST /shots/generate` → `POST /shots/edit` (with a user request) to confirm agent decisions, ensure references are enforced when requested, and verify shot assets persist with updated seeds/prompts.
 - **Completed:** Migrated all LLM calls to OpenAI Responses API with model `gpt-5-nano-2025-08-07`; fixed `shot_agent_prompt` import causing `/shots/edit` 500.
 - **Next:** Start frontend integration (script input → characters → storyboard grid) or extend shot_agent logic for more granular regenerate cases; pick UI next if ready.
+
+## 2025-11-20 (frontend)
+
+- **Completed:** Added lightweight static frontend (`frontend/index.html`, `frontend/styles.css`, `frontend/app.js`) with a modern layout for the full flow: script/style ingestion, character cards, scene plan preview, storyboard grid, and inline shot edit requests wired to `/script`, `/characters/generate`, `/shots/generate`, and `/shots/edit`.
+- **Needs Testing:** Run the backend locally, open `frontend/index.html`, and walk through the full flow with real creds. Verify CORS, that images render, shot edits refresh in place, and that toast messaging surfaces API errors.
+- **Next:** Add character refine/regenerate controls in the UI, keep session state across reloads (localStorage), and consider packaging as a proper Next.js/React app if time allows.
+- **Completed:** Hardened all LLM agents to force JSON responses via `response_format=json_object` and improved parse error reporting (backend/services/llm_agents.py) to prevent /shots/edit 502s when the model returns non-JSON text.
+- **Completed:** Added backwards-compatible fallback for older OpenAI SDKs that do not support `response_format` to avoid ingest failures (backend/services/llm_agents.py).

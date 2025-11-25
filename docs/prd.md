@@ -372,7 +372,22 @@ Tools that wrap FIBO’s API:
 # 12. System Architecture
 
 - **Backend:** FastAPI  
-- **Frontend:** Any modern JS framework  
+- **Frontend recommendation:** 
+#### Tech Stack
+- **Framework:** Next.js 14 or React 18  
+- **Styling:** Tailwind CSS  
+- **Components:** shadcn/ui (or equivalent headless + utility-first components)  
+- **State Management:** React Query (TanStack Query) for API communication  
+- **Networking:** Axios or Fetch  
+- **Type Safety:** TypeScript  
+- **Image Rendering:** Next/Image where possible  
+- **Grid Layout:** CSS Grid or Flexbox responsive layouts  
+
+#### UI / UX Guidelines
+- Clean, minimal UI with a focus on readability and production-quality visuals  
+- High contrast, modern typography, consistent padding and spacing  
+- Responsive layout optimized for desktop and tablet  
+
 - **Endpoints:**  
   - Script ingestion  
   - Character generation  

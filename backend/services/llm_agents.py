@@ -40,16 +40,25 @@ def _extract_output_text(resp: Any) -> str:
     return ""
 
 
-def _call_llm(system_prompt: str, user_prompt: str) -> str:
+def _call_llm(system_prompt: str, user_prompt: str, *, force_json: bool = True) -> str:
     settings = get_settings()
     client = _get_client()
-    response = client.responses.create(
-        model=settings.openai_model,
-        input=[
+    response_format = {"type": "json_object"} if force_json else None
+    kwargs = {
+        "model": settings.openai_model,
+        "input": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_prompt},
         ],
-    )
+    }
+    if response_format:
+        kwargs["response_format"] = response_format
+    try:
+        response = client.responses.create(**kwargs)
+    except TypeError:
+        # Fallback for older openai SDK versions that don't support response_format
+        kwargs.pop("response_format", None)
+        response = client.responses.create(**kwargs)
     return _extract_output_text(response)
 
 
@@ -70,12 +79,13 @@ def run_character_cast_agent(script: str) -> CharacterCastAgentOutput:
         f"Schema:\n{schema}\n\n"
         f"Script:\n" + script.strip()
     )
-    content = _call_llm(character_cast_agent_prompt.strip(), user_prompt)
+    content = _call_llm(character_cast_agent_prompt.strip(), user_prompt, force_json=True)
     json_payload = _extract_json_block(content)
     try:
         return CharacterCastAgentOutput.model_validate_json(json_payload)
     except Exception as exc:  # pylint: disable=broad-except
-        raise RuntimeError(f"Unable to parse character agent output: {exc}") from exc
+        snippet = json_payload[:500] if isinstance(json_payload, str) else str(json_payload)[:500]
+        raise RuntimeError(f"Unable to parse character agent output: {exc}. Raw: {snippet}") from exc
 
 
 def run_script_agent(script: str, characters: List[CharacterInfo]) -> ScriptAgentOutput:
@@ -87,12 +97,13 @@ def run_script_agent(script: str, characters: List[CharacterInfo]) -> ScriptAgen
         f"Characters:\n{characters_json}\n\n"
         f"Script:\n{script.strip()}"
     )
-    content = _call_llm(script_agent_prompt.strip(), user_prompt)
+    content = _call_llm(script_agent_prompt.strip(), user_prompt, force_json=True)
     json_payload = _extract_json_block(content)
     try:
         return ScriptAgentOutput.model_validate_json(json_payload)
     except Exception as exc:  # pylint: disable=broad-except
-        raise RuntimeError(f"Unable to parse script agent output: {exc}") from exc
+        snippet = json_payload[:500] if isinstance(json_payload, str) else str(json_payload)[:500]
+        raise RuntimeError(f"Unable to parse script agent output: {exc}. Raw: {snippet}") from exc
 
 
 def run_shot_agent(
@@ -116,9 +127,10 @@ def run_shot_agent(
         f"Schema:\n{schema}\n\n"
         f"Context:\n{json.dumps(context, indent=2)}"
     )
-    content = _call_llm(shot_agent_prompt.strip(), user_prompt)
+    content = _call_llm(shot_agent_prompt.strip(), user_prompt, force_json=True)
     json_payload = _extract_json_block(content)
     try:
         return ShotAgentDecision.model_validate_json(json_payload)
     except Exception as exc:  # pylint: disable=broad-except
-        raise RuntimeError(f"Unable to parse shot agent output: {exc}") from exc
+        snippet = json_payload[:500] if isinstance(json_payload, str) else str(json_payload)[:500]
+        raise RuntimeError(f"Unable to parse shot agent output: {exc}. Raw: {snippet}") from exc
