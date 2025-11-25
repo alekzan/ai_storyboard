@@ -96,3 +96,26 @@ class ShotEditResponse(BaseModel):
     session_id: str
     decision: str
     shot: ShotAsset
+
+
+class CharacterUpdateRequest(BaseModel):
+    session_id: str
+    name: str = Field(..., description="Character name to update.")
+    character_description: str = Field(..., description="New description to use for generation/refine.")
+
+
+class CharacterUpdateResponse(BaseModel):
+    session_id: str
+    characters: List[CharacterInfo]
+
+
+class ShotUpdateRequest(BaseModel):
+    session_id: str
+    scene_number: int
+    shot_number: int
+    shot_description: str = Field(..., description="New shot description to use for generation/refine.")
+
+
+class ShotUpdateResponse(BaseModel):
+    session_id: str
+    scenes: List[Scene]

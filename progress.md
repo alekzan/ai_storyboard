@@ -28,3 +28,4 @@
 - **Next:** Add character refine/regenerate controls in the UI, keep session state across reloads (localStorage), and consider packaging as a proper Next.js/React app if time allows.
 - **Completed:** Hardened all LLM agents to force JSON responses via `response_format=json_object` and improved parse error reporting (backend/services/llm_agents.py) to prevent /shots/edit 502s when the model returns non-JSON text.
 - **Completed:** Added backwards-compatible fallback for older OpenAI SDKs that do not support `response_format` to avoid ingest failures (backend/services/llm_agents.py).
+- **Completed:** Added prompt-edit endpoints for characters and shots plus frontend UI to edit them; shot edits clear stale assets so storyboard grid stays in sync (backend/services/session_updates.py, backend/schemas.py, backend/app.py, frontend/app.js).

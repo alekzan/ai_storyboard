@@ -74,7 +74,7 @@ const renderCharacters = () => {
       const imgBlock = asset
         ? `<div class="image-frame"><img src="${asset.image_url}" alt="${c.name}" /></div>`
         : `<div class="image-frame"><span class="muted small">No image yet</span></div>`;
-      const description = asset?.description || c.character_description || "No description";
+      const description = c.character_description || asset?.description || "No description";
       const seedBadge = asset ? `<span class="badge">seed ${asset.seed}</span>` : "";
       return `<article class="card">
         ${imgBlock}
@@ -83,7 +83,10 @@ const renderCharacters = () => {
             <h3>${c.name}</h3>
             ${seedBadge}
           </div>
-          <p class="muted small">${description}</p>
+          <textarea class="char-edit" data-name="${c.name}" placeholder="Character prompt">${description}</textarea>
+          <div class="actions" style="justify-content: flex-end;">
+            <button class="ghost character-save" type="button" data-name="${c.name}">Save Prompt</button>
+          </div>
         </div>
       </article>`;
     })
@@ -118,7 +121,10 @@ const renderScenes = () => {
                     ${shot.characters_in_shot.map((ch) => `<span class="tag">${ch}</span>`).join("")}
                   </div>
                 </div>
-                <p class="muted small">${shot.shot_description}</p>
+                <textarea class="shot-edit" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" placeholder="Shot description">${shot.shot_description}</textarea>
+                <div class="actions" style="justify-content: flex-end;">
+                  <button class="ghost shot-save" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}">Save Shot Prompt</button>
+                </div>
               </div>`
             )
             .join("")}
@@ -267,6 +273,75 @@ els.generateShots.addEventListener("click", async () => {
   } finally {
     setLoading(els.generateShots, false);
     els.generateShots.textContent = "Generate Shots";
+  }
+});
+
+els.characterList.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".character-save");
+  if (!btn) return;
+  const name = btn.dataset.name;
+  const card = btn.closest(".card");
+  const textarea = card.querySelector(".char-edit");
+  const character_description = textarea.value.trim();
+  if (!character_description) {
+    setToast("Character prompt cannot be empty.", "error");
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+  try {
+    const data = await postJson("/characters/update", {
+      session_id: state.sessionId,
+      name,
+      character_description,
+    });
+    state.characters = data.characters || state.characters;
+    // Drop cached asset for this character to avoid stale image
+    state.characterAssets = state.characterAssets.filter((c) => c.name !== name);
+    renderCharacters();
+    renderShots();
+    setToast(`Saved prompt for ${name}. Regenerate to see changes.`);
+  } catch (err) {
+    setToast(err.message || "Failed to save character prompt", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Save Prompt";
+  }
+});
+
+els.sceneList.addEventListener("click", async (e) => {
+  const btn = e.target.closest(".shot-save");
+  if (!btn) return;
+  const { scene, shot } = btn.dataset;
+  const container = btn.closest(".stack");
+  const textarea = container.querySelector(".shot-edit");
+  const shot_description = textarea.value.trim();
+  if (!shot_description) {
+    setToast("Shot prompt cannot be empty.", "error");
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = "Saving...";
+  try {
+    const data = await postJson("/shots/update", {
+      session_id: state.sessionId,
+      scene_number: Number(scene),
+      shot_number: Number(shot),
+      shot_description,
+    });
+    state.scenes = data.scenes || state.scenes;
+    // Remove stale generated asset for this shot
+    state.shots = state.shots.filter(
+      (s) => !(s.scene_number === Number(scene) && s.shot_number === Number(shot))
+    );
+    renderScenes();
+    renderShots();
+    setToast(`Saved prompt for scene ${scene}, shot ${shot}. Regenerate shots to see changes.`);
+  } catch (err) {
+    setToast(err.message || "Failed to save shot prompt", "error");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Save Shot Prompt";
   }
 });
 
