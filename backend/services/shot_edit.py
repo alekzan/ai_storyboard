@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from fastapi import HTTPException, status
 
+from ..agent_structured_outputs import Scene, Shot
 from ..agent_tools import generate_shot_with_refs, refine_shot_with_refs
 from ..schemas import ShotAsset, ShotEditRequest, ShotEditResponse
 from ..session_store import SessionStore, session_store
@@ -114,10 +115,22 @@ class ShotEditService:
                     ),
                 ) from exc
 
+        # Compute an updated description so the UI reflects the agent change and future
+        # generations use the latest narrative.
+        # Prefer the agent-supplied full description; otherwise fall back to the edit text
+        # or user request so the UI reflects the latest narrative without stacking
+        # "Edit:" lines.
+        new_shot_description = (
+            decision.shot_description
+            or (decision.edit_prompt if decision.action == "refine" else None)
+            or (payload.user_request if decision.action == "generate" else None)
+            or shot_asset.shot_description
+        )
+
         updated = ShotAsset(
             scene_number=shot_asset.scene_number,
             shot_number=shot_asset.shot_number,
-            shot_description=shot_asset.shot_description,
+            shot_description=new_shot_description,
             characters_in_shot=shot_asset.characters_in_shot,
             image_url=result["image_url"],
             seed=result["seed"],
@@ -127,6 +140,31 @@ class ShotEditService:
 
         key = f"{payload.scene_number}:{payload.shot_number}"
         session.shot_assets[key] = updated
+
+        # Also persist the updated description in the structured scenes so the prompt
+        # text area shows the agent's change.
+        for scene_idx, scene in enumerate(session.scenes):
+            if scene.scene_number != payload.scene_number:
+                continue
+            updated_shots: list[Shot] = []
+            for shot in scene.shots:
+                if shot.shot_number == payload.shot_number:
+                    updated_shots.append(
+                        Shot(
+                            shot_number=shot.shot_number,
+                            shot_description=new_shot_description,
+                            characters_in_shot=shot.characters_in_shot,
+                        )
+                    )
+                else:
+                    updated_shots.append(shot)
+            session.scenes[scene_idx] = Scene(
+                scene_number=scene.scene_number,
+                scene_title=scene.scene_title,
+                shots=updated_shots,
+            )
+            break
+
         self.store.update_session(session)
 
         return ShotEditResponse(session_id=session.session_id, decision=action, shot=updated)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Iterable
 
 from fastapi import HTTPException, status
@@ -38,26 +39,41 @@ class CharacterGenerationService:
 
         targets = self._resolve_characters(session, payload.character_names)
 
-        generated_assets: list[CharacterAsset] = []
-        for character in targets:
+        def _generate(character):
             try:
                 result = generate_character(character.character_description, session.style)
-            except RuntimeError as exc:
-                raise HTTPException(
-                    status_code=status.HTTP_502_BAD_GATEWAY,
-                    detail=f"Character generation failed for {character.name}: {exc}",
-                ) from exc
+                return character, result
+            except Exception as exc:  # pylint: disable=broad-except
+                # Convert to RuntimeError so outer handler can wrap as HTTPException
+                raise RuntimeError(exc) from exc
 
-            asset = CharacterAsset(
-                name=character.name,
-                description=character.character_description,
-                image_url=result["image_url"],
-                seed=result["seed"],
-                structured_prompt=result["structured_prompt"],
-                raw_structured_prompt=result["raw_structured_prompt"],
-            )
-            session.character_assets[character.name] = asset
-            generated_assets.append(asset)
+        generated_assets: list[CharacterAsset] = []
+        max_workers = min(len(targets), 8) or 1
+        try:
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                future_map = {executor.submit(_generate, character): character.name for character in targets}
+                for future in as_completed(future_map):
+                    character, result = future.result()
+                    asset = CharacterAsset(
+                        name=character.name,
+                        description=character.character_description,
+                        image_url=result["image_url"],
+                        seed=result["seed"],
+                        structured_prompt=result["structured_prompt"],
+                        raw_structured_prompt=result["raw_structured_prompt"],
+                    )
+                    session.character_assets[character.name] = asset
+                    generated_assets.append(asset)
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Character generation failed: {exc}",
+            ) from exc
+        except Exception as exc:  # pylint: disable=broad-except
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=f"Character generation failed: {exc}",
+            ) from exc
 
         self.store.update_session(session)
         return CharacterGenerationResponse(session_id=session.session_id, characters=generated_assets)

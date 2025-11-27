@@ -132,5 +132,12 @@ def run_shot_agent(
     try:
         return ShotAgentDecision.model_validate_json(json_payload)
     except Exception as exc:  # pylint: disable=broad-except
+        # Fallback: if the model drifts off-schema, default to regenerate with user request appended.
         snippet = json_payload[:500] if isinstance(json_payload, str) else str(json_payload)[:500]
-        raise RuntimeError(f"Unable to parse shot agent output: {exc}. Raw: {snippet}") from exc
+        fallback_desc = f"{shot_description}\nEdit: {user_request}".strip()
+        return ShotAgentDecision(
+            action="generate",
+            shot_description=fallback_desc,
+            edit_prompt=None,
+            use_reference_images=True,
+        )

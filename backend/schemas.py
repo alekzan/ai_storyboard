@@ -69,6 +69,17 @@ class ShotGenerationResponse(BaseModel):
     shots: List[ShotAsset]
 
 
+class SingleShotGenerationRequest(BaseModel):
+    session_id: str
+    scene_number: int
+    shot_number: int
+
+
+class SingleShotGenerationResponse(BaseModel):
+    session_id: str
+    shot: ShotAsset
+
+
 class ShotRefineRequest(BaseModel):
     session_id: str
     scene_number: int

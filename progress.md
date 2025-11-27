@@ -29,3 +29,29 @@
 - **Completed:** Hardened all LLM agents to force JSON responses via `response_format=json_object` and improved parse error reporting (backend/services/llm_agents.py) to prevent /shots/edit 502s when the model returns non-JSON text.
 - **Completed:** Added backwards-compatible fallback for older OpenAI SDKs that do not support `response_format` to avoid ingest failures (backend/services/llm_agents.py).
 - **Completed:** Added prompt-edit endpoints for characters and shots plus frontend UI to edit them; shot edits clear stale assets so storyboard grid stays in sync (backend/services/session_updates.py, backend/schemas.py, backend/app.py, frontend/app.js).
+- **Completed:** Character flow now uses current textarea prompts without extra saves, supports per-character regenerate with edit/cancel toggles, and bulk generation syncs prompts first; character generation runs in parallel via ThreadPoolExecutor (backend/services/character_generation.py, frontend/app.js).
+- **Completed:** Added single-shot generation endpoint for per-shot regeneration and sequential display, hid the old scenes panel, and ensured edited shot prompts are used for bulk/per-shot generation; character images render in portrait frames (backend/app.py, backend/schemas.py, backend/services/shot_generation.py, frontend/app.js, frontend/styles.css).
+- **Completed:** Layout tweaks: wider app shell (1440px), character grid forced to 4-per-row with tighter spacing, and shot grid set to 3 larger cards per row with taller frames (frontend/styles.css, frontend/index.html).
+
+## 2025-11-24 (agent refine UX)
+
+- **Completed:** Shot agent edits now update the shot prompt text area with the agent-modified description, persist it in session scenes, and lock further agent requests/edits for that shot after sending. The refine modal auto-closes on send success.
+- **Completed:** Refine modal now closes immediately on send; shot clicks are temporarily blocked only while the agent call is in flight, then re-enabled once the new image arrives. Prompts refresh with the agent-modified text.
+- **Completed:** Added a safe fallback in shot agent parsing—if the model returns non-JSON, we default to regenerate with the user edit appended instead of failing. Prevents 502s from off-schema LLM output.
+- **Needs Testing:** Run a script → generate shots → click a shot image → submit an agent edit. Confirm the modal closes right after send, the textarea updates to the new description, the shot re-renders, and you can open refine again after the response (but not while the request is in flight). Also verify /shots/edit no longer returns 502 on malformed agent output.
+
+## 2025-11-25 (style & cinematic prompts)
+
+- **Completed:** Strengthened style definitions: outline = pure black-and-white line storyboard (no color/gray), anime = 2D flat cel shading (no 3D), 3D = Pixar-like stylized, realistic unchanged. Character prompts now force pure white background.
+- **Completed:** Shot prompts now encourage explicit cinematic framing (camera angles, intentional composition) to reduce flat shots.
+- **Needs Testing:** Regenerate characters in each style to confirm backgrounds stay white and style matches the new definitions. Regenerate shots to confirm more cinematic framing language is reflected.
+
+## 2025-11-25 (character backgrounds/styles tuning)
+
+- **Completed:** Strengthened character prompts to hard-enforce pure white backgrounds across all styles; outline now explicitly ignores all color terms and renders black ink line art only (no gray, no fills). Other styles keep pure white studio backdrops with no environment unless asked.
+- **Needs Testing:** Regenerate characters in anime/3d/realistic/outline to confirm white backgrounds; outline should be strictly black-and-white line art with no gray or color.
+
+## 2025-11-26 (character generation timeout handling)
+
+- **Completed:** Added timeout and clearer error handling for Bria character generation; 504/HTTP errors now surface as 502 to the client instead of crashing the server.
+- **Needs Testing:** Retry character generation when Bria returns 504/timeout; ensure the API responds with a usable 502 error message instead of a 500 stack trace.

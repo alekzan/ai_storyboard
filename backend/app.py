@@ -11,6 +11,8 @@ from .schemas import (
     CharacterGenerationResponse,
     ShotGenerationRequest,
     ShotGenerationResponse,
+    SingleShotGenerationRequest,
+    SingleShotGenerationResponse,
     ShotRefineRequest,
     ShotRefineResponse,
     ShotEditRequest,
@@ -94,6 +96,15 @@ def create_app() -> FastAPI:
     )
     def generate_shots(payload: ShotGenerationRequest):
         return shot_generation_service.generate(payload)
+
+    @app.post(
+        "/shots/generate_one",
+        response_model=SingleShotGenerationResponse,
+        tags=["pipeline"],
+        status_code=status.HTTP_201_CREATED,
+    )
+    def generate_single_shot(payload: SingleShotGenerationRequest):
+        return shot_generation_service.generate_single(payload)
 
     @app.post(
         "/shots/refine",

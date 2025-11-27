@@ -8,7 +8,13 @@ from fastapi import HTTPException, status
 
 from ..agent_structured_outputs import Scene, Shot
 from ..agent_tools import generate_shot_with_refs
-from ..schemas import ShotAsset, ShotGenerationRequest, ShotGenerationResponse
+from ..schemas import (
+    ShotAsset,
+    ShotGenerationRequest,
+    ShotGenerationResponse,
+    SingleShotGenerationRequest,
+    SingleShotGenerationResponse,
+)
 from ..session_store import SessionStore, session_store
 
 
@@ -103,3 +109,49 @@ class ShotGenerationService:
 
         self.store.update_session(session)
         return ShotGenerationResponse(session_id=session.session_id, shots=generated_shots)
+
+    def generate_single(self, payload: SingleShotGenerationRequest) -> SingleShotGenerationResponse:
+        session = self.store.get_session(payload.session_id)
+        if not session:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+        scene = next((s for s in session.scenes if s.scene_number == payload.scene_number), None)
+        if not scene:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Scene not found")
+
+        shot = next((s for s in scene.shots if s.shot_number == payload.shot_number), None)
+        if not shot:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shot not found")
+
+        references = self._collect_references(shot, session)
+        shot_description = self._compose_shot_description(scene, shot)
+
+        try:
+            result = generate_shot_with_refs(
+                shot_description=shot_description,
+                style=session.style,
+                reference_image_urls=references,
+            )
+        except RuntimeError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail=(
+                    f"Shot generation failed for scene {scene.scene_number} "
+                    f"shot {shot.shot_number}: {exc}"
+                ),
+            ) from exc
+
+        asset = ShotAsset(
+            scene_number=scene.scene_number,
+            shot_number=shot.shot_number,
+            shot_description=shot.shot_description,
+            characters_in_shot=shot.characters_in_shot,
+            image_url=result["image_url"],
+            seed=result["seed"],
+            structured_prompt=result["structured_prompt"],
+            raw_structured_prompt=result["raw_structured_prompt"],
+        )
+        key = f"{scene.scene_number}:{shot.shot_number}"
+        session.shot_assets[key] = asset
+        self.store.update_session(session)
+        return SingleShotGenerationResponse(session_id=session.session_id, shot=asset)

@@ -24,8 +24,8 @@ def _bria_headers():
 
 STYLE_MAP = {
     "outline": (
-        "black and white storyboard frame, clean line art, minimal shading, "
-        "simple shapes, clear silhouettes, like a classic storyboard sketch"
+        "black and white storyboard frame, clean line art, zero color, zero gray shading, "
+        "inked outlines only, simple shapes, high-contrast silhouettes, looks like a classic storyboard sketch"
     ),
     "realistic": (
         "highly realistic cinematic frame, natural lighting, realistic materials and skin, "
@@ -33,11 +33,11 @@ STYLE_MAP = {
     ),
     "3d": (
         "high quality 3D animation still, soft stylized characters, detailed materials, "
-        "similar to Pixar style"
+        "Pixar-like cinematic render, gentle lighting"
     ),
     "anime": (
-        "anime style frame, clean line art, cel shaded colors, expressive faces, "
-        "dynamic lighting"
+        "2D anime frame, flat cel shading, bold line art, simplified shapes, expressive faces, "
+        "no 3D rendering, no heavy detail"
     ),
 }
 
@@ -48,8 +48,9 @@ def build_storyboard_prompt(shot_description: str, style: str) -> str:
 
     prompt = (
         f"Storyboard frame for a film or series. Style: {style_desc}. "
-        f"Single shot, clear composition, no on screen text or captions. "
-        f"Focus on the key action, acting and camera framing. "
+        f"Single cinematic shot with intentional camera choice and framing (e.g., wide, close-up, over-the-shoulder, low angle, dutch tilt when fitting). "
+        f"Include depth, lighting, and composition that feel like a film still. "
+        f"No on-screen text or captions. "
         f"Scene to depict: {shot_description}"
     )
     return prompt
@@ -67,10 +68,24 @@ def build_character_prompt(character_description: str, style: str) -> str:
     style_key = style.lower().strip()
     style_desc = STYLE_MAP.get(style_key, STYLE_MAP["realistic"])
 
+    # Style-specific constraints for characters
+    if style_key == "outline":
+        style_enforcement = (
+            "Pure black ink line art on a flat white background. No color anywhere. No gray shading. "
+            "No gradients, no tones. Ignore color words in the description—render as black line art only. "
+            "No environment; leave the background fully white."
+        )
+    else:
+        style_enforcement = (
+            "Pure white seamless studio background only—no scene, no environment, no props unless explicitly requested. "
+            "Do not add backgrounds or scenery. Subject is cleanly separated on white."
+        )
+
     prompt = (
         f"Single character design for a storyboard. Style: {style_desc}. "
-        f"Full or three quarter body view on a clean white studio background. "
-        f"No props or environment unless specified. No on screen text. "
+        f"{style_enforcement} "
+        f"Full or three quarter body view. "
+        f"No on-screen text. "
         f"Character should be clearly readable for use in multiple storyboard shots. "
         f"Character description: {character_description}"
     )
@@ -102,8 +117,12 @@ def generate_character(
     }
 
     print("⏳ Generating character...")
-    response = requests.post(BRIA_API_URL, json=payload, headers=_bria_headers())
-    response.raise_for_status()
+    try:
+        response = requests.post(BRIA_API_URL, json=payload, headers=_bria_headers(), timeout=60)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as exc:  # includes timeouts and HTTP errors
+        status = getattr(exc.response, "status_code", None)
+        raise RuntimeError(f"Bria character generation failed (status={status}): {exc}") from exc
 
     data = response.json()["result"]
     image_url = data["image_url"]
