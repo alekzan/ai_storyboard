@@ -521,6 +521,7 @@ els.editModalSend.addEventListener("click", async () => {
   const key = `${scene}:${shot}`;
   state.shotAgentPending.add(key);
   state.shotRefineLoading.add(key);
+  renderShots();
   // Close immediately to free space; request continues in background.
   closeEditModal();
   try {
