@@ -47,12 +47,32 @@
           <div class="stack">
             <label class="stack">
               <span>Style</span>
-              <select id="style-select">
-                <option value="realistic">Realistic</option>
-                <option value="outline">Outline</option>
-                <option value="3d">3D</option>
-                <option value="anime">Anime</option>
-              </select>
+              <div id="style-options" class="style-grid">
+                <button type="button" class="style-option selected" data-style="realistic">
+                  <div class="style-thumb">
+                    <img src="./images/realistic_example.png" alt="Realistic style example" />
+                  </div>
+                  <span>Realistic</span>
+                </button>
+                <button type="button" class="style-option" data-style="outline">
+                  <div class="style-thumb">
+                    <img src="./images/outline_example.png" alt="Outline storyboard example" />
+                  </div>
+                  <span>Outline</span>
+                </button>
+                <button type="button" class="style-option" data-style="3d">
+                  <div class="style-thumb">
+                    <img src="./images/3d_example.png" alt="3D Pixar-like style example" />
+                  </div>
+                  <span>3D</span>
+                </button>
+                <button type="button" class="style-option" data-style="anime">
+                  <div class="style-thumb">
+                    <img src="./images/anime_example.png" alt="2D anime style example" />
+                  </div>
+                  <span>Anime</span>
+                </button>
+              </div>
             </label>
             <div class="stack">
               <span class="muted">Quick start</span>

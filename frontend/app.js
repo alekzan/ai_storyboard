@@ -23,7 +23,7 @@ const els = {
   health: document.getElementById("health-status"),
   scriptForm: document.getElementById("script-form"),
   scriptInput: document.getElementById("script-input"),
-  styleSelect: document.getElementById("style-select"),
+  styleOptions: document.getElementById("style-options"),
   ingestBtn: document.getElementById("ingest-btn"),
   ingestStatus: document.getElementById("ingest-status"),
   sessionPill: document.getElementById("session-pill"),
@@ -55,6 +55,16 @@ const setToast = (message, tone = "info") => {
 };
 
 const backendBase = () => els.backendUrl.value.replace(/\/$/, "");
+
+const setStyle = (style) => {
+  state.style = style;
+  if (!els.styleOptions) return;
+  els.styleOptions.querySelectorAll(".style-option").forEach((btn) => {
+    const isActive = btn.dataset.style === style;
+    btn.classList.toggle("selected", isActive);
+    btn.setAttribute("aria-pressed", isActive ? "true" : "false");
+  });
+};
 
 const asJson = async (res) => {
   if (!res.ok) {
@@ -273,7 +283,7 @@ els.pingButton.addEventListener("click", async () => {
 els.scriptForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const script = els.scriptInput.value.trim();
-  const style = els.styleSelect.value;
+  const style = state.style;
   if (!script) {
     setToast("Please paste a script first.", "error");
     return;
@@ -283,7 +293,7 @@ els.scriptForm.addEventListener("submit", async (e) => {
   try {
     const data = await postJson("/script", { script, style });
     state.script = data.script;
-    state.style = data.style;
+    setStyle(data.style || style);
     state.characters = data.characters || [];
     state.characterBaseline = Object.fromEntries(state.characters.map((c) => [c.name, c.character_description]));
     state.scenes = data.scenes || [];
@@ -309,6 +319,16 @@ els.scriptForm.addEventListener("submit", async (e) => {
     setLoading(els.ingestBtn, false, "Ingest Script");
   }
 });
+
+if (els.styleOptions) {
+  els.styleOptions.addEventListener("click", (e) => {
+    const btn = e.target.closest(".style-option");
+    if (!btn) return;
+    const selectedStyle = btn.dataset.style;
+    if (selectedStyle) setStyle(selectedStyle);
+  });
+  setStyle(state.style);
+}
 
 els.generateCharacters.addEventListener("click", async () => {
   if (!state.sessionId) {

@@ -55,3 +55,8 @@
 
 - **Completed:** Added timeout and clearer error handling for Bria character generation; 504/HTTP errors now surface as 502 to the client instead of crashing the server.
 - **Needs Testing:** Retry character generation when Bria returns 504/timeout; ensure the API responds with a usable 502 error message instead of a 500 stack trace.
+
+## 2025-11-27 (UX style picker)
+
+- **Completed:** Replaced the Step 1 style dropdown with visual thumbnail selectors (realistic, outline, 3D, anime) backed by example images; selection state syncs with ingest submissions.
+- **Needs Testing:** Open the frontend (served from `frontend/`) and confirm the thumbnail picker highlights the chosen style, sends it to `/script`, and works across reloads.
