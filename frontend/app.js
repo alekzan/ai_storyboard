@@ -199,13 +199,17 @@ const renderShots = () => {
           : "";
         const isEditing = state.shotEditing.has(key) || !asset;
         const locked = state.shotAgentPending.has(key);
+        const loadingShot = state.shotLoading.has(key);
         const readOnlyAttr = locked ? "readonly" : asset && !isEditing ? "readonly" : "";
+        const textClass = `shot-edit ${isEditing ? "editing" : "readonly"}`;
+        const genDisabled = !charactersReady || state.shotBulkGenerating || loadingShot;
+        const genLabel = loadingShot ? "Generating..." : "Generate this shot";
         const buttons = isEditing
           ? `<div class="actions" style="justify-content: flex-end; gap: 8px;">
                ${asset ? `<button class="ghost shot-cancel" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}">Cancel</button>` : ""}
-               <button class="primary shot-generate" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" ${charactersReady && !state.shotBulkGenerating ? "" : "disabled"}>Generate this shot</button>
+               <button class="primary shot-generate" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" ${genDisabled ? "disabled" : ""}>${genLabel}</button>
              </div>`
-      : `<div class="actions" style="justify-content: flex-end;">
+          : `<div class="actions" style="justify-content: flex-end;">
                <button class="ghost shot-edit-toggle" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" ${state.shotBulkGenerating ? "disabled" : ""}>Edit</button>
              </div>`;
         return `<article class="card" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}">
@@ -217,7 +221,7 @@ const renderShots = () => {
             ${seedBadge}
           </div>
           ${imgBlock}
-          <textarea class="shot-edit" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" placeholder="Shot description" ${readOnlyAttr}>${description}</textarea>
+          <textarea class="${textClass}" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" placeholder="Shot description" ${readOnlyAttr}>${description}</textarea>
           <div class="tag-row">
             ${characters.map((ch) => `<span class="tag">${ch}</span>`).join("")}
           </div>
@@ -665,17 +669,21 @@ els.shotGrid.addEventListener("click", async (e) => {
 
   const editBtn = e.target.closest(".shot-edit-toggle");
   if (editBtn) {
-    const key = `${editBtn.dataset.scene}:${editBtn.dataset.shot}`;
+    const sceneNum = Number(editBtn.dataset.scene);
+    const shotNum = Number(editBtn.dataset.shot);
+    const key = `${sceneNum}:${shotNum}`;
     if (state.shotAgentPending.has(key)) return;
     state.shotEditing.add(key);
     renderShots();
-    const card = editBtn.closest(".card");
-    const textarea = card?.querySelector(".shot-edit");
-    if (textarea) {
-      textarea.removeAttribute("readonly");
-      textarea.focus();
-      const end = textarea.value.length;
-      textarea.setSelectionRange(end, end);
+    const freshTextarea = document.querySelector(
+      `article.card[data-scene="${sceneNum}"][data-shot="${shotNum}"] .shot-edit`
+    );
+    if (freshTextarea) {
+      freshTextarea.removeAttribute("readonly");
+      freshTextarea.classList.add("editing");
+      freshTextarea.focus();
+      const start = 0;
+      freshTextarea.setSelectionRange(start, start);
     }
     return;
   }

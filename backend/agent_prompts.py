@@ -27,6 +27,23 @@ Do NOT:
 • Add commentary, notes, or explanation.
 • Return prose outside the schema.
 
+MAKE SURE TO NOT USE THESE WORDS to describe your characters:
+• preteen
+• pre-teen
+• pre teen
+• young teen
+• underage
+• minor
+• barely legal
+• schoolgirl
+• school girl
+• schoolboy
+• school boy
+• high-schooler
+• cheerleader uniform
+• school uniform
+• sailor uniform
+
 Return ONLY the structured list of characters with their finalized descriptions.
 
 """
