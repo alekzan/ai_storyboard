@@ -72,10 +72,12 @@ def _extract_json_block(text: str) -> str:
     return text
 
 
-def run_character_cast_agent(script: str) -> CharacterCastAgentOutput:
+def run_character_cast_agent(script: str, style: str) -> CharacterCastAgentOutput:
     schema = json.dumps(CharacterCastAgentOutput.model_json_schema(), indent=2)
     user_prompt = (
         "Read the following script and respond ONLY with valid JSON conforming to the schema.\n"
+        f"Style (for visual intent): {style}. If style=outline, avoid all color terms; focus on line work only. "
+        "If style=3d, assume Pixar-like stylized 3D. If style=anime, assume flat 2D anime. If style=realistic, assume cinematic realism.\n"
         f"Schema:\n{schema}\n\n"
         f"Script:\n" + script.strip()
     )
@@ -88,11 +90,13 @@ def run_character_cast_agent(script: str) -> CharacterCastAgentOutput:
         raise RuntimeError(f"Unable to parse character agent output: {exc}. Raw: {snippet}") from exc
 
 
-def run_script_agent(script: str, characters: List[CharacterInfo]) -> ScriptAgentOutput:
+def run_script_agent(script: str, characters: List[CharacterInfo], style: str) -> ScriptAgentOutput:
     schema = json.dumps(ScriptAgentOutput.model_json_schema(), indent=2)
     characters_json = json.dumps([c.model_dump() for c in characters], indent=2)
     user_prompt = (
         "Use the provided script and main characters to output scenes and shots as JSON.\n"
+        f"Style (for framing + tone): {style}. If style=outline, keep descriptions minimal on color and lean on shapes/line clarity; "
+        "3d = Pixar-like stylized 3D; anime = 2D flat anime; realistic = cinematic realism.\n"
         f"Schema:\n{schema}\n\n"
         f"Characters:\n{characters_json}\n\n"
         f"Script:\n{script.strip()}"
@@ -113,6 +117,7 @@ def run_shot_agent(
     previous_structured_prompt: dict,
     seed: int,
     characters_in_shot: List[str],
+    style: str,
 ) -> ShotAgentDecision:
     schema = json.dumps(ShotAgentDecision.model_json_schema(), indent=2)
     context = {
@@ -121,6 +126,7 @@ def run_shot_agent(
         "characters_in_shot": characters_in_shot,
         "previous_structured_prompt": previous_structured_prompt,
         "user_request": user_request,
+        "style": style,
     }
     user_prompt = (
         "Decide whether to refine or regenerate this shot. Respond ONLY with JSON matching the schema.\n"

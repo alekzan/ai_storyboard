@@ -401,7 +401,7 @@ h2 {
 
 .image-frame.shot-lg {
   aspect-ratio: 16 / 9;
-  min-height: 320px;
+  min-height: 0;
 }
 
 .image-frame img {

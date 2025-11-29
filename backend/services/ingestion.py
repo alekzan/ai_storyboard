@@ -16,7 +16,7 @@ class ScriptIngestionService:
 
     def ingest_script(self, *, script: str, style: str) -> ScriptIngestionResponse:
         try:
-            character_output = run_character_cast_agent(script)
+            character_output = run_character_cast_agent(script, style)
         except RuntimeError as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -24,7 +24,7 @@ class ScriptIngestionService:
             ) from exc
 
         try:
-            script_output = run_script_agent(script, character_output.characters)
+            script_output = run_script_agent(script, character_output.characters, style)
         except RuntimeError as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

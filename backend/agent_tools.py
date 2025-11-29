@@ -174,6 +174,12 @@ def refine_character(
 
     print("⏳ Refining character...")
     response = requests.post(BRIA_API_URL, json=payload, headers=_bria_headers())
+    if response.status_code >= 400:
+        try:
+            detail = response.json()
+        except Exception:  # pragma: no cover
+            detail = response.text
+        raise RuntimeError(f"Bria shot generation failed (status={response.status_code}): {detail}")
     response.raise_for_status()
 
     data = response.json()["result"]
@@ -233,7 +239,12 @@ def generate_shot_with_refs(
 
     print("⏳ Generating shot with character reference...")
     response = requests.post(BRIA_API_URL, json=payload, headers=_bria_headers())
-    response.raise_for_status()
+    if response.status_code >= 400:
+        try:
+            detail = response.json()
+        except Exception:  # pragma: no cover
+            detail = response.text
+        raise RuntimeError(f"Bria shot generation failed (status={response.status_code}): {detail}")
 
     data = response.json()["result"]
     image_url = data["image_url"]
@@ -296,7 +307,12 @@ def refine_shot_with_refs(
 
     print("⏳ Refining shot with character reference...")
     response = requests.post(BRIA_API_URL, json=payload, headers=_bria_headers())
-    response.raise_for_status()
+    if response.status_code >= 400:
+        try:
+            detail = response.json()
+        except Exception:  # pragma: no cover
+            detail = response.text
+        raise RuntimeError(f"Bria shot refinement failed (status={response.status_code}): {detail}")
 
     data = response.json()["result"]
     image_url = data["image_url"]

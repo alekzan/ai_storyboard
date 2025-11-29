@@ -58,6 +58,7 @@ class ShotEditService:
                 previous_structured_prompt=shot_asset.structured_prompt,
                 seed=shot_asset.seed,
                 characters_in_shot=shot_asset.characters_in_shot,
+                style=session.style,
             )
         except RuntimeError as exc:
             raise HTTPException(

@@ -15,6 +15,7 @@ const state = {
   charLoading: new Set(),
   shotLoading: new Set(),
   shotRefineLoading: new Set(),
+  shotBulkGenerating: false,
 };
 
 const els = {
@@ -30,7 +31,7 @@ const els = {
   characterList: document.getElementById("character-list"),
   generateCharacters: document.getElementById("generate-characters"),
   sceneList: document.getElementById("scene-list"),
-  generateShots: document.getElementById("generate-shots"),
+  generateShotsAll: document.getElementById("generate-shots-all"),
   shotGrid: document.getElementById("shot-grid"),
   toast: document.getElementById("toast"),
   editModal: document.getElementById("edit-modal-backdrop"),
@@ -42,6 +43,12 @@ const els = {
   lightboxBackdrop: document.getElementById("lightbox-backdrop"),
   lightboxImage: document.getElementById("lightbox-image"),
   lightboxClose: document.getElementById("lightbox-close"),
+};
+
+const allCharactersReady = () => {
+  if (!state.characters.length) return false;
+  const readyCount = state.characterAssets.filter((c) => !!c.image_url).length;
+  return readyCount >= state.characters.length;
 };
 
 const setToast = (message, tone = "info") => {
@@ -84,8 +91,8 @@ const postJson = (path, body) =>
 const setSession = (sessionId) => {
   state.sessionId = sessionId;
   els.sessionPill.textContent = sessionId ? `Session: ${sessionId}` : "No session yet";
-  els.generateCharacters.disabled = !sessionId;
-  els.generateShots.disabled = !sessionId;
+  if (els.generateCharacters) els.generateCharacters.disabled = !sessionId;
+  if (els.generateShotsAll) els.generateShotsAll.disabled = !sessionId || !allCharactersReady() || state.shotBulkGenerating;
   if (!sessionId && els.ingestStatus) els.ingestStatus.textContent = "";
 };
 
@@ -150,8 +157,12 @@ const renderShots = () => {
     return;
   }
   container.classList.remove("empty-state");
+  if (els.generateShotsAll) {
+    els.generateShotsAll.disabled = !state.sessionId || !allCharactersReady() || state.shotBulkGenerating;
+  }
 
   const shotMap = new Map(state.shots.map((s) => [`${s.scene_number}-${s.shot_number}`, s]));
+  const charactersReady = allCharactersReady();
   container.innerHTML = state.scenes
     .flatMap((scene) =>
       scene.shots.map((shot) => {
@@ -192,10 +203,10 @@ const renderShots = () => {
         const buttons = isEditing
           ? `<div class="actions" style="justify-content: flex-end; gap: 8px;">
                ${asset ? `<button class="ghost shot-cancel" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}">Cancel</button>` : ""}
-               <button class="primary shot-generate" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}">Generate this shot</button>
+               <button class="primary shot-generate" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" ${charactersReady && !state.shotBulkGenerating ? "" : "disabled"}>Generate this shot</button>
              </div>`
-          : `<div class="actions" style="justify-content: flex-end;">
-               <button class="ghost shot-edit-toggle" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}">Edit</button>
+      : `<div class="actions" style="justify-content: flex-end;">
+               <button class="ghost shot-edit-toggle" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" ${state.shotBulkGenerating ? "disabled" : ""}>Edit</button>
              </div>`;
         return `<article class="card" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}">
           <div class="actions" style="justify-content: space-between;">
@@ -386,9 +397,13 @@ els.generateCharacters.addEventListener("click", async () => {
   }
 });
 
-els.generateShots.addEventListener("click", async () => {
+els.generateShotsAll?.addEventListener("click", async () => {
   if (!state.sessionId) {
     setToast("Create a session first.", "error");
+    return;
+  }
+  if (!allCharactersReady()) {
+    setToast("Generate all characters first.", "error");
     return;
   }
   const shotAreas = Array.from(document.querySelectorAll(".shot-edit"));
@@ -411,8 +426,10 @@ els.generateShots.addEventListener("click", async () => {
     setToast(err.message || "Failed to sync shot prompts before generation", "error");
     return;
   }
-  setLoading(els.generateShots, true, "Generating...");
-  els.generateShots.disabled = true;
+  setLoading(els.generateShotsAll, true, "Generating...");
+  els.generateShotsAll.disabled = true;
+  state.shotBulkGenerating = true;
+  renderShots();
   const allShots = state.scenes.flatMap((scene) =>
     scene.shots.map((shot) => ({ scene: scene.scene_number, shot: shot.shot_number }))
   );
@@ -440,9 +457,11 @@ els.generateShots.addEventListener("click", async () => {
     setToast(err.message || "Failed to generate shots", "error");
   } finally {
     state.shotLoading.clear();
-    els.generateShots.disabled = false;
-    setLoading(els.generateShots, false);
-    els.generateShots.textContent = "Generate Shots";
+    state.shotBulkGenerating = false;
+    renderShots();
+    els.generateShotsAll.disabled = false;
+    setLoading(els.generateShotsAll, false);
+    els.generateShotsAll.textContent = "Generate all shots";
   }
 });
 
@@ -623,6 +642,11 @@ els.shotGrid.addEventListener("click", async (e) => {
     const sceneNum = Number(imgFrame.dataset.scene);
     const shotNum = Number(imgFrame.dataset.shot);
     const key = `${sceneNum}:${shotNum}`;
+    if (state.shotBulkGenerating) return;
+    if (!allCharactersReady()) {
+      setToast("Generate all characters first.", "error");
+      return;
+    }
     if (state.shotAgentPending.has(key)) return;
     openEditModal(sceneNum, shotNum);
     return;
@@ -682,6 +706,11 @@ els.shotGrid.addEventListener("click", async (e) => {
     const sceneNum = Number(genShotBtn.dataset.scene);
     const shotNum = Number(genShotBtn.dataset.shot);
     const key = `${sceneNum}:${shotNum}`;
+    if (state.shotBulkGenerating) return;
+    if (!allCharactersReady()) {
+      setToast("Generate all characters first.", "error");
+      return;
+    }
     if (state.shotAgentPending.has(key)) return;
     const card = genShotBtn.closest(".card");
     const textarea = card.querySelector(".shot-edit");
