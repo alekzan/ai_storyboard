@@ -47,6 +47,12 @@ class ShotGenerationService:
 
         for name in shot.characters_in_shot:
             asset = session.character_assets.get(name)
+            if not asset:
+                # fallback to case-insensitive match
+                for key, val in session.character_assets.items():
+                    if key.lower() == name.lower():
+                        asset = val
+                        break
             if asset:
                 references.append(asset.image_url)
             else:

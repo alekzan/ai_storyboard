@@ -16,6 +16,7 @@ const state = {
   shotLoading: new Set(),
   shotRefineLoading: new Set(),
   shotBulkGenerating: false,
+  charErrors: {},
 };
 
 const els = {
@@ -109,6 +110,7 @@ const renderCharacters = () => {
     .map((c) => {
       const asset = assetMap.get(c.name);
       const loading = state.charLoading.has(c.name);
+      const warn = state.charErrors?.[c.name];
       const imgBlock = asset
         ? `<div class="image-wrapper">
              <div class="image-frame portrait">
@@ -136,6 +138,7 @@ const renderCharacters = () => {
             ${seedBadge}
           </div>
           <textarea class="char-edit" data-name="${c.name}" placeholder="Character prompt" ${readOnlyAttr}>${description}</textarea>
+          ${warn ? `<div class="warning">Generation failed: ${warn}</div>` : ""}
           ${buttons}
         </div>
       </article>`;
@@ -368,29 +371,49 @@ els.generateCharacters.addEventListener("click", async () => {
     setToast(err.message || "Failed to sync prompts before generation", "error");
     return;
   }
+  const assetMap = new Map(state.characterAssets.map((c) => [c.name, c]));
+  const targets = state.characters
+    .map((c) => c.name)
+    .filter((name) => !assetMap.get(name)?.image_url);
+
+  if (!targets.length) {
+    setToast("All characters are already generated.", "info");
+    return;
+  }
+
   setLoading(els.generateCharacters, true, "Generating...");
   document.querySelectorAll(".char-generate").forEach((btn) => (btn.disabled = true));
   try {
-    const targets = state.characters.map((c) => c.name);
     state.charLoading = new Set(targets);
     renderCharacters();
     await Promise.all(
       targets.map(async (name) => {
-        const data = await postJson("/characters/generate", {
-          session_id: state.sessionId,
-          character_names: [name],
-        });
-        const asset = (data.characters || [])[0];
-        if (asset) {
-          const others = state.characterAssets.filter((c) => c.name !== name);
-          state.characterAssets = [...others, asset];
+        try {
+          const data = await postJson("/characters/generate", {
+            session_id: state.sessionId,
+            character_names: [name],
+          });
+          const asset = (data.characters || [])[0];
+          if (asset) {
+            const others = state.characterAssets.filter((c) => c.name !== name);
+            state.characterAssets = [...others, asset];
+            state.charErrors[name] = undefined;
+          }
+        } catch (err) {
+          state.charErrors[name] = err.message || "Generation failed.";
+        } finally {
           state.charLoading.delete(name);
           renderCharacters();
         }
       })
     );
     renderShots();
-    setToast("Characters generated.");
+    const failed = Object.entries(state.charErrors || {}).filter(([, msg]) => msg);
+    if (failed.length) {
+      setToast(`Some characters failed: ${failed.map(([n]) => n).join(", ")}`, "error");
+    } else {
+      setToast("Characters generated.");
+    }
   } catch (err) {
     setToast(err.message || "Failed to generate characters", "error");
   } finally {
@@ -515,11 +538,14 @@ els.characterList.addEventListener("click", async (e) => {
       });
       const others = state.characterAssets.filter((c) => c.name !== name);
       state.characterAssets = [...others, ...(data.characters || [])];
+      state.charErrors[name] = undefined;
       state.charLoading.delete(name);
       renderCharacters();
       renderShots();
       setToast(`Generated ${name}.`);
     } catch (err) {
+      state.charErrors[name] = err.message || "Generation failed.";
+      renderCharacters();
       setToast(err.message || "Failed to generate character", "error");
     } finally {
       state.charLoading.delete(name);

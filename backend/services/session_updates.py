@@ -31,12 +31,14 @@ class SessionUpdateService:
         if idx is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Character not found")
 
+        prev = session.characters[idx]
         session.characters[idx] = CharacterInfo(
-            name=session.characters[idx].name,
+            name=prev.name,
             character_description=payload.character_description,
         )
-        # Drop any previously generated asset to avoid stale renders
-        session.character_assets.pop(session.characters[idx].name, None)
+        # Drop asset only if description actually changed
+        if payload.character_description.strip() != (prev.character_description or "").strip():
+            session.character_assets.pop(prev.name, None)
         self.store.update_session(session)
         return CharacterUpdateResponse(session_id=session.session_id, characters=session.characters)
 

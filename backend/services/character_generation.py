@@ -32,12 +32,22 @@ class CharacterGenerationService:
                 )
         return targets
 
+    def _filter_missing_assets(self, session, targets):
+        """Return only characters that do not yet have generated assets in the session."""
+        existing = {name.lower() for name in session.character_assets.keys()}
+        return [c for c in targets if c.name.lower() not in existing]
+
     def generate(self, payload: CharacterGenerationRequest) -> CharacterGenerationResponse:
         session = self.store.get_session(payload.session_id)
         if not session:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
         targets = self._resolve_characters(session, payload.character_names)
+        targets = self._filter_missing_assets(session, targets)
+
+        # Nothing to do; return empty list but keep session intact.
+        if not targets:
+            return CharacterGenerationResponse(session_id=session.session_id, characters=[])
 
         def _generate(character):
             try:

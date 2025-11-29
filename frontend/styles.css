@@ -123,6 +123,15 @@ textarea {
   color: rgba(249, 250, 251, 0.55);
 }
 
+.warning {
+  color: #ffb4b4;
+  background: rgba(255, 107, 107, 0.08);
+  border: 1px solid rgba(255, 107, 107, 0.35);
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
 button {
   border: none;
   border-radius: 12px;
