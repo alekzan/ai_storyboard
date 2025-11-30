@@ -70,6 +70,18 @@ class ShotEditService:
         use_refs_flag = decision.use_reference_images
         references: list[str] = []
 
+        # Attempt to infer an updated character list from the agent-proposed description
+        new_characters_in_shot = shot_asset.characters_in_shot
+        if decision.shot_description:
+            session_character_names = [c.name for c in session.characters]
+            lowered_desc = decision.shot_description.lower()
+            inferred = []
+            for name in session_character_names:
+                if name.lower() in lowered_desc:
+                    inferred.append(name)
+            if inferred:
+                new_characters_in_shot = inferred
+
         if action not in {"refine", "generate"}:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -98,8 +110,9 @@ class ShotEditService:
                 ) from exc
         else:
             description = decision.shot_description or f"{shot_asset.shot_description}. {payload.user_request}"
-            if shot_asset.characters_in_shot and (use_refs_flag is not False):
-                references = self._collect_references(session, shot_asset.characters_in_shot)
+            # if the agent implied new characters, use that list to collect references
+            if new_characters_in_shot and (use_refs_flag is not False):
+                references = self._collect_references(session, new_characters_in_shot)
 
             try:
                 result = generate_shot_with_refs(
@@ -128,11 +141,13 @@ class ShotEditService:
             or shot_asset.shot_description
         )
 
+        characters_in_shot_final = new_characters_in_shot or shot_asset.characters_in_shot
+
         updated = ShotAsset(
             scene_number=shot_asset.scene_number,
             shot_number=shot_asset.shot_number,
             shot_description=new_shot_description,
-            characters_in_shot=shot_asset.characters_in_shot,
+            characters_in_shot=characters_in_shot_final,
             image_url=result["image_url"],
             seed=result["seed"],
             structured_prompt=result["structured_prompt"],
@@ -154,7 +169,7 @@ class ShotEditService:
                         Shot(
                             shot_number=shot.shot_number,
                             shot_description=new_shot_description,
-                            characters_in_shot=shot.characters_in_shot,
+                            characters_in_shot=characters_in_shot_final,
                         )
                     )
                 else:
