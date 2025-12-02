@@ -97,6 +97,52 @@ const setSession = (sessionId) => {
   if (!sessionId && els.ingestStatus) els.ingestStatus.textContent = "";
 };
 
+const syncScenesState = (scenes, shotAssets, { forceEditingAll = false } = {}) => {
+  if (Array.isArray(shotAssets)) {
+    state.shots = shotAssets;
+  }
+  state.scenes = scenes || [];
+  state.shotBaseline = Object.fromEntries(
+    state.scenes.flatMap((scene) =>
+      scene.shots.map((shot) => [`${scene.scene_number}:${shot.shot_number}`, shot.shot_description])
+    )
+  );
+
+  const validKeys = new Set();
+  const assetKeys = new Set((state.shots || []).map((s) => `${s.scene_number}:${s.shot_number}`));
+  state.scenes.forEach((scene) => {
+    scene.shots.forEach((shot) => {
+      const key = `${scene.scene_number}:${shot.shot_number}`;
+      validKeys.add(key);
+    });
+  });
+
+  // Prune transient state to existing shots only
+  state.shotLoading = new Set([...state.shotLoading].filter((k) => validKeys.has(k)));
+  state.shotRefineLoading = new Set([...state.shotRefineLoading].filter((k) => validKeys.has(k)));
+  state.shotAgentPending = new Set([...state.shotAgentPending].filter((k) => validKeys.has(k)));
+
+  const nextEditing = new Set();
+  state.scenes.forEach((scene) => {
+    scene.shots.forEach((shot) => {
+      const key = `${scene.scene_number}:${shot.shot_number}`;
+      if (forceEditingAll || !assetKeys.has(key) || state.shotEditing.has(key)) {
+        nextEditing.add(key);
+      }
+    });
+  });
+  state.shotEditing = nextEditing;
+};
+
+const applyShotUpdateResponse = (data, options) => {
+  if (!data) return;
+  if (data.scenes) {
+    syncScenesState(data.scenes, data.shot_assets, options);
+  } else if (Array.isArray(data.shot_assets)) {
+    state.shots = data.shot_assets;
+  }
+};
+
 const renderCharacters = () => {
   const container = els.characterList;
   if (!state.characters.length) {
@@ -161,79 +207,123 @@ const renderShots = () => {
   }
   container.classList.remove("empty-state");
   if (els.generateShotsAll) {
-    els.generateShotsAll.disabled = !state.sessionId || !allCharactersReady() || state.shotBulkGenerating;
+    const hasEmptyShot = state.scenes.some((scene) =>
+      scene.shots.some((shot) => !shot.shot_description?.trim())
+    );
+    els.generateShotsAll.disabled =
+      !state.sessionId || !allCharactersReady() || state.shotBulkGenerating || hasEmptyShot;
   }
-
   const shotMap = new Map(state.shots.map((s) => [`${s.scene_number}-${s.shot_number}`, s]));
   const charactersReady = allCharactersReady();
+
+  const renderCard = (scene, shot, isLast) => {
+    const asset = shotMap.get(`${scene.scene_number}-${shot.shot_number}`);
+    const key = `${scene.scene_number}:${shot.shot_number}`;
+    const isLoading = state.shotLoading.has(key);
+    const isRefineLoading = state.shotRefineLoading.has(key);
+    const showPlaceholder = isRefineLoading || (!asset && isLoading);
+    const hasText = !!shot.shot_description?.trim();
+    const imgBlock = `<div class="image-wrapper">
+      <div class="image-frame shot-lg ${showPlaceholder ? "loading" : ""}" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}">
+        ${
+          showPlaceholder
+            ? ""
+            : asset
+              ? `<img src="${asset.image_url}" alt="Scene ${scene.scene_number} shot ${shot.shot_number}"/>
+                 <div class="image-actions">
+                   <a class="icon-btn" title="Download" href="${asset.image_url}" download target="_blank" rel="noreferrer"><span class="glyph">⤓</span></a>
+                   <button class="icon-btn maximize" title="View larger" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}"><span class="glyph">⤢</span></button>
+                 </div>`
+              : `<span class="muted small">Not generated yet</span>`
+        }
+      </div>
+      <div class="tooltip">Ask AI Agent to refine ✨</div>
+    </div>`;
+    const description = shot.shot_description || "";
+    const characters = asset?.characters_in_shot || shot.characters_in_shot || [];
+    const seedBadge = asset ? `<span class="badge">seed ${asset.seed}</span>` : "";
+    const promptSnippet = asset?.raw_structured_prompt
+      ? `<details class="small muted"><summary>JSON prompt</summary><pre class="small muted" style="white-space: pre-wrap;">${asset.raw_structured_prompt}</pre></details>`
+      : "";
+    const isEditing = state.shotEditing.has(key) || !asset;
+    const locked = state.shotAgentPending.has(key);
+    const loadingShot = state.shotLoading.has(key);
+    const readOnlyAttr = locked ? "readonly" : asset && !isEditing ? "readonly" : "";
+    const textClass = `shot-edit ${isEditing ? "editing" : "readonly"}`;
+    const genDisabled = !hasText || !charactersReady || state.shotBulkGenerating || loadingShot;
+    const genLabel = loadingShot ? "Generating..." : "Generate this shot";
+    const buttons = isEditing
+      ? `<div class="actions" style="justify-content: flex-end; gap: 8px;">
+           ${asset ? `<button class="ghost shot-cancel" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}">Cancel</button>` : ""}
+           <button class="primary shot-generate" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" ${genDisabled ? "disabled" : ""}>${genLabel}</button>
+         </div>`
+      : `<div class="actions" style="justify-content: flex-end;">
+           <button class="ghost shot-edit-toggle" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" ${state.shotBulkGenerating ? "disabled" : ""}>Edit</button>
+         </div>`;
+    return `<div class="shot-card-wrap">
+      <button class="adder-fab shot-add-btn" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" data-position="before" title="Add shot before">
+        <span class="adder-plus">+</span>
+      </button>
+      <article class="card" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}">
+      <div class="actions" style="justify-content: space-between;">
+        <div>
+          <p class="eyebrow">Scene ${scene.scene_number}</p>
+          <h3>Shot ${shot.shot_number}</h3>
+        </div>
+        ${seedBadge}
+      </div>
+      ${imgBlock}
+      <textarea class="${textClass}" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" placeholder="Shot description" ${readOnlyAttr}>${description}</textarea>
+      <div class="tag-row">
+        ${characters.map((ch) => `<span class="tag">${ch}</span>`).join("")}
+      </div>
+      ${promptSnippet}
+      ${buttons}
+    </article>
+    </div>`;
+  };
+
   container.innerHTML = state.scenes
-    .flatMap((scene) =>
-      scene.shots.map((shot) => {
-        const asset = shotMap.get(`${scene.scene_number}-${shot.shot_number}`);
-        const key = `${scene.scene_number}:${shot.shot_number}`;
-        const isLoading = state.shotLoading.has(key);
-        const isRefineLoading = state.shotRefineLoading.has(key);
-        const showPlaceholder = isRefineLoading || (!asset && isLoading);
-        const imgBlock = `<div class="image-wrapper">
-          <div class="image-frame shot-lg ${showPlaceholder ? "loading" : ""}" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}">
-            ${
-              showPlaceholder
-                ? ""
-                : asset
-                  ? `<img src="${asset.image_url}" alt="Scene ${scene.scene_number} shot ${shot.shot_number}"/>`
-                  : `<span class="muted small">Not generated yet</span>`
-            }
+    .map((scene) => {
+      const shotRow = scene.shots.map((shot, idx) => renderCard(scene, shot, idx === scene.shots.length - 1));
+      const endAddCard = `<button class="card adder-card shot-add-btn" type="button" data-scene="${scene.scene_number}" data-shot="${scene.shots.length + 1}" data-position="before" title="Add shot after last">
+        <span class="adder-plus">+</span>
+        <span class="muted small">Add shot</span>
+      </button>`;
+      return `<div class="scene-block">
+        <div class="scene-block-head">
+          <div>
+            <p class="eyebrow">Scene ${scene.scene_number}</p>
+            <h3>${scene.scene_title || ""}</h3>
           </div>
-          <div class="image-actions">
-            ${
-              asset
-                ? `<a class="icon-btn" title="Download" href="${asset.image_url}" download target="_blank" rel="noreferrer"><span class="glyph">⤓</span></a>
-                   <button class="icon-btn maximize" title="View larger" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}"><span class="glyph">⤢</span></button>`
-                : ""
-            }
-          </div>
-          <div class="tooltip">Ask AI Agent to refine ✨</div>
-        </div>`;
-        const description = shot.shot_description;
-        const characters = asset?.characters_in_shot || shot.characters_in_shot || [];
-        const seedBadge = asset ? `<span class="badge">seed ${asset.seed}</span>` : "";
-        const promptSnippet = asset?.raw_structured_prompt
-          ? `<details class="small muted"><summary>JSON prompt</summary><pre class="small muted" style="white-space: pre-wrap;">${asset.raw_structured_prompt}</pre></details>`
-          : "";
-        const isEditing = state.shotEditing.has(key) || !asset;
-        const locked = state.shotAgentPending.has(key);
-        const loadingShot = state.shotLoading.has(key);
-        const readOnlyAttr = locked ? "readonly" : asset && !isEditing ? "readonly" : "";
-        const textClass = `shot-edit ${isEditing ? "editing" : "readonly"}`;
-        const genDisabled = !charactersReady || state.shotBulkGenerating || loadingShot;
-        const genLabel = loadingShot ? "Generating..." : "Generate this shot";
-        const buttons = isEditing
-          ? `<div class="actions" style="justify-content: flex-end; gap: 8px;">
-               ${asset ? `<button class="ghost shot-cancel" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}">Cancel</button>` : ""}
-               <button class="primary shot-generate" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" ${genDisabled ? "disabled" : ""}>${genLabel}</button>
-             </div>`
-          : `<div class="actions" style="justify-content: flex-end;">
-               <button class="ghost shot-edit-toggle" type="button" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" ${state.shotBulkGenerating ? "disabled" : ""}>Edit</button>
-             </div>`;
-        return `<article class="card" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}">
-          <div class="actions" style="justify-content: space-between;">
-            <div>
-              <p class="eyebrow">Scene ${scene.scene_number}</p>
-              <h3>Shot ${shot.shot_number}</h3>
-            </div>
-            ${seedBadge}
-          </div>
-          ${imgBlock}
-          <textarea class="${textClass}" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}" placeholder="Shot description" ${readOnlyAttr}>${description}</textarea>
-          <div class="tag-row">
-            ${characters.map((ch) => `<span class="tag">${ch}</span>`).join("")}
-          </div>
-          ${promptSnippet}
-          ${buttons}
-        </article>`;
-      })
-    )
+          <span class="muted small">${scene.shots.length} shot${scene.shots.length === 1 ? "" : "s"}</span>
+        </div>
+        <div class="shot-grid-row">${shotRow.join("")}${endAddCard}</div>
+      </div>`;
+    })
     .join("");
+};
+
+const addShotAt = async (sceneNumber, targetShotNumber, position = "before") => {
+  if (!state.sessionId) {
+    setToast("Create a session first.", "error");
+    return;
+  }
+  const shot_number = position === "after" ? Number(targetShotNumber) + 1 : Number(targetShotNumber);
+  try {
+    const data = await postJson("/shots/update", {
+      session_id: state.sessionId,
+      scene_number: Number(sceneNumber),
+      shot_number,
+      shot_description: "",
+      insert_before: true,
+    });
+    applyShotUpdateResponse(data);
+    renderShots();
+    setToast("New shot added. Write a prompt or ask the agent.");
+  } catch (err) {
+    setToast(err.message || "Failed to add shot", "error");
+  }
 };
 
 const setLoading = (el, loading, label) => {
@@ -314,17 +404,9 @@ els.scriptForm.addEventListener("submit", async (e) => {
     setStyle(data.style || style);
     state.characters = data.characters || [];
     state.characterBaseline = Object.fromEntries(state.characters.map((c) => [c.name, c.character_description]));
-    state.scenes = data.scenes || [];
-    state.shotBaseline = Object.fromEntries(
-      (data.scenes || []).flatMap((scene) =>
-        scene.shots.map((shot) => [`${scene.scene_number}:${shot.shot_number}`, shot.shot_description])
-      )
-    );
-    state.shotEditing = new Set(
-      (data.scenes || []).flatMap((scene) => scene.shots.map((shot) => `${scene.scene_number}:${shot.shot_number}`))
-    );
     state.characterAssets = [];
     state.shots = [];
+    syncScenesState(data.scenes || [], [], { forceEditingAll: true });
     setSession(data.session_id);
     renderCharacters();
     renderScenes();
@@ -434,16 +516,22 @@ els.generateShotsAll?.addEventListener("click", async () => {
     return;
   }
   const shotAreas = Array.from(document.querySelectorAll(".shot-edit"));
+  const missing = shotAreas.filter((el) => !el.value.trim());
+  if (missing.length) {
+    setToast("Add text to every shot before generating.", "error");
+    return;
+  }
   try {
     await Promise.all(
-      shotAreas.map((el) =>
-        postJson("/shots/update", {
+      shotAreas.map(async (el) => {
+        const data = await postJson("/shots/update", {
           session_id: state.sessionId,
           scene_number: Number(el.dataset.scene),
           shot_number: Number(el.dataset.shot),
           shot_description: el.value.trim(),
-        })
-      )
+        });
+        applyShotUpdateResponse(data);
+      })
     );
     shotAreas.forEach((el) => {
       const key = `${el.dataset.scene}:${el.dataset.shot}`;
@@ -561,6 +649,7 @@ els.shotGrid.addEventListener("input", (e) => {
   const sceneNum = Number(textarea.dataset.scene);
   const shotNum = Number(textarea.dataset.shot);
   const val = textarea.value;
+  const key = `${sceneNum}:${shotNum}`;
   state.scenes = state.scenes.map((scene) =>
     scene.scene_number === sceneNum
       ? {
@@ -571,6 +660,13 @@ els.shotGrid.addEventListener("input", (e) => {
         }
       : scene
   );
+  state.shotEditing.add(key);
+  const card = textarea.closest("article.card");
+  const genBtn = card?.querySelector(".shot-generate");
+  if (genBtn) {
+    const loading = state.shotLoading.has(key);
+    genBtn.disabled = !val.trim() || !allCharactersReady() || state.shotBulkGenerating || loading;
+  }
 });
 
 els.editModalClose.addEventListener("click", () => {
@@ -650,7 +746,7 @@ els.sceneList.addEventListener("click", async (e) => {
       shot_number: Number(shot),
       shot_description,
     });
-    state.scenes = data.scenes || state.scenes;
+    applyShotUpdateResponse(data);
     // Remove stale generated asset for this shot
     state.shots = state.shots.filter(
       (s) => !(s.scene_number === Number(scene) && s.shot_number === Number(shot))
@@ -667,6 +763,16 @@ els.sceneList.addEventListener("click", async (e) => {
 });
 
 els.shotGrid.addEventListener("click", async (e) => {
+  const addBtn = e.target.closest(".shot-add-btn");
+  if (addBtn) {
+    const sceneNum = Number(addBtn.dataset.scene);
+    const shotNum = Number(addBtn.dataset.shot || 0);
+    const position = addBtn.dataset.position || "before";
+    const target = position === "after" ? shotNum : Math.max(shotNum, 1);
+    addShotAt(sceneNum, target, position);
+    return;
+  }
+
   const imgFrame = e.target.closest(".image-frame.shot-lg");
   if (imgFrame) {
     const sceneNum = Number(imgFrame.dataset.scene);
@@ -758,12 +864,13 @@ els.shotGrid.addEventListener("click", async (e) => {
     state.shotLoading.add(key);
     renderShots();
     try {
-      await postJson("/shots/update", {
+      const updateResp = await postJson("/shots/update", {
         session_id: state.sessionId,
         scene_number: sceneNum,
         shot_number: shotNum,
         shot_description,
       });
+      applyShotUpdateResponse(updateResp);
       state.shotBaseline[key] = shot_description;
       const data = await postJson("/shots/generate_one", {
         session_id: state.sessionId,

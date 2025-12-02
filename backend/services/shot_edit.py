@@ -15,19 +15,32 @@ class ShotEditService:
     def __init__(self, store: SessionStore | None = None) -> None:
         self.store = store or session_store
 
-    def _get_session_and_shot(self, session_id: str, scene_number: int, shot_number: int):
+    def _get_session_shot_data(self, session_id: str, scene_number: int, shot_number: int):
         session = self.store.get_session(session_id)
         if not session:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
         key = f"{scene_number}:{shot_number}"
         shot_asset = session.shot_assets.get(key)
-        if not shot_asset:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Shot not found; generate it before editing.",
-            )
-        return session, shot_asset
+        planned_shot = None
+        for scene in session.scenes:
+            if scene.scene_number != scene_number:
+                continue
+            planned_shot = next((s for s in scene.shots if s.shot_number == shot_number), None)
+            break
+
+        if not planned_shot:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Shot not found")
+
+        return session, shot_asset, planned_shot
+
+    def _infer_characters_in_text(self, description: str, session) -> list[str]:
+        lowered = description.lower()
+        names: list[str] = []
+        for character in session.characters:
+            if character.name.lower() in lowered:
+                names.append(character.name)
+        return names
 
     def _collect_references(self, session, characters: list[str]) -> list[str]:
         refs: list[str] = []
@@ -47,9 +60,103 @@ class ShotEditService:
         return refs
 
     def edit(self, payload: ShotEditRequest) -> ShotEditResponse:
-        session, shot_asset = self._get_session_and_shot(
+        session, shot_asset, planned_shot = self._get_session_shot_data(
             payload.session_id, payload.scene_number, payload.shot_number
         )
+
+        # If no asset exists yet, treat this as a first-time generation using the
+        # shot description plus the user request as guidance. We still run the
+        # shot agent to synthesize a full shot description.
+        if not shot_asset:
+            base_description = (planned_shot.shot_description or "").strip()
+            combined_description = "\n".join(filter(None, [base_description, payload.user_request])).strip()
+
+            try:
+                decision = run_shot_agent(
+                    shot_description=base_description or "Placeholder shot",
+                    user_request=payload.user_request,
+                    previous_structured_prompt={},
+                    seed=0,
+                    characters_in_shot=planned_shot.characters_in_shot,
+                    style=session.style,
+                )
+            except RuntimeError:
+                # Fall back to a simple generate path if the agent fails
+                decision = ShotAgentDecision(
+                    action="generate",
+                    shot_description=combined_description or payload.user_request,
+                    edit_prompt=None,
+                    use_reference_images=True,
+                )
+
+            new_description = (
+                decision.shot_description
+                or result.get("structured_prompt", {}).get("short_description")
+                or combined_description
+                or payload.user_request
+                or ""
+            )
+            characters_in_shot = (
+                planned_shot.characters_in_shot
+                or self._infer_characters_in_text(new_description or combined_description, session)
+            )
+            references = (
+                self._collect_references(session, characters_in_shot) if characters_in_shot else []
+            )
+
+            try:
+                result = generate_shot_with_refs(
+                    shot_description=new_description,
+                    style=session.style,
+                    reference_image_urls=references,
+                )
+            except RuntimeError as exc:
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail=(
+                        f"Shot generation failed for scene {payload.scene_number} "
+                        f"shot {payload.shot_number}: {exc}"
+                    ),
+                ) from exc
+
+            generated = ShotAsset(
+                scene_number=payload.scene_number,
+                shot_number=planned_shot.shot_number,
+                shot_description=new_description,
+                characters_in_shot=characters_in_shot,
+                image_url=result["image_url"],
+                seed=result["seed"],
+                structured_prompt=result["structured_prompt"],
+                raw_structured_prompt=result["raw_structured_prompt"],
+            )
+            key = f"{payload.scene_number}:{payload.shot_number}"
+            session.shot_assets[key] = generated
+
+            # Persist updated description in the scene so the UI reflects the agent change.
+            for scene_idx, scene in enumerate(session.scenes):
+                if scene.scene_number != payload.scene_number:
+                    continue
+                updated_shots: list[Shot] = []
+                for shot in scene.shots:
+                    if shot.shot_number == payload.shot_number:
+                        updated_shots.append(
+                            Shot(
+                                shot_number=shot.shot_number,
+                                shot_description=new_description,
+                                characters_in_shot=characters_in_shot,
+                            )
+                        )
+                    else:
+                        updated_shots.append(shot)
+                session.scenes[scene_idx] = Scene(
+                    scene_number=scene.scene_number,
+                    scene_title=scene.scene_title,
+                    shots=updated_shots,
+                )
+                break
+
+            self.store.update_session(session)
+            return ShotEditResponse(session_id=session.session_id, decision=decision.action, shot=generated)
 
         try:
             decision = run_shot_agent(
@@ -136,6 +243,7 @@ class ShotEditService:
         # "Edit:" lines.
         new_shot_description = (
             decision.shot_description
+            or result.get("structured_prompt", {}).get("short_description")
             or (decision.edit_prompt if decision.action == "refine" else None)
             or (payload.user_request if decision.action == "generate" else None)
             or shot_asset.shot_description

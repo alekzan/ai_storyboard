@@ -60,3 +60,10 @@
 
 - **Completed:** Replaced the Step 1 style dropdown with visual thumbnail selectors (realistic, outline, 3D, anime) backed by example images; selection state syncs with ingest submissions.
 - **Needs Testing:** Open the frontend (served from `frontend/`) and confirm the thumbnail picker highlights the chosen style, sends it to `/script`, and works across reloads.
+
+## 2025-11-28 (storyboard shot insertion UX)
+
+- **Completed:** Backend `/shots/update` now supports inserting new shots at any position, renumbers existing shots safely (including rekeyed shot assets), and infers characters from descriptions when missing. Shot edits can now generate a first image when no asset exists by combining the shot text with the user request.
+- **Completed:** Storyboard grid renders per-scene blocks with `+` adders before/between/after shots. New shots start empty with placeholders, sync back to the session, and keep existing generated shots intact after renumbering. Single/bulk generation and "Ask AI" are blocked until a shot description is provided, with state sync for renumbered assets.
+- **Needs Testing:** Ingest a script and confirm the initial shots render. Add shots at the start/middle/end, then generate via manual prompt and via "Ask AI" when no asset exists. Verify existing generated shots keep their images/seeds after inserting new shots and that bulk generate refuses empty prompts.
+- **Next:** Persist session/prompt state across reloads and add dedicated character refine/regenerate controls in the UI.

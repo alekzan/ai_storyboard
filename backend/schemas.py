@@ -125,8 +125,16 @@ class ShotUpdateRequest(BaseModel):
     scene_number: int
     shot_number: int
     shot_description: str = Field(..., description="New shot description to use for generation/refine.")
+    insert_before: bool = Field(
+        default=False,
+        description="If true and shot_number exists, insert a new shot before it instead of updating the existing shot.",
+    )
 
 
 class ShotUpdateResponse(BaseModel):
     session_id: str
     scenes: List[Scene]
+    shot_assets: List[ShotAsset] | None = Field(
+        default=None,
+        description="Optional list of shot assets after the update; included when renumbering occurs.",
+    )
