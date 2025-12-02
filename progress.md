@@ -67,3 +67,14 @@
 - **Completed:** Storyboard grid renders per-scene blocks with `+` adders before/between/after shots. New shots start empty with placeholders, sync back to the session, and keep existing generated shots intact after renumbering. Single/bulk generation and "Ask AI" are blocked until a shot description is provided, with state sync for renumbered assets.
 - **Needs Testing:** Ingest a script and confirm the initial shots render. Add shots at the start/middle/end, then generate via manual prompt and via "Ask AI" when no asset exists. Verify existing generated shots keep their images/seeds after inserting new shots and that bulk generate refuses empty prompts.
 - **Next:** Persist session/prompt state across reloads and add dedicated character refine/regenerate controls in the UI.
+
+## 2025-12-01 (debug fixture)
+
+- **Completed:** Added a debug-only `/debug/load_fixture` endpoint that loads a canned script/characters/scenes without calling the LLM, plus a “Load demo prompts” button in the frontend to trigger it.
+- **Needs Testing:** Click “Load demo prompts,” then generate characters/shots and run agent edits to ensure the shortcut session behaves the same as a freshly ingested one.
+- **Next:** Remove or replace with selectable fixtures once debugging is done.
+
+## 2025-12-01 (shot agent tags)
+
+- **Completed:** Agent-generated shots created from empty cards now persist inferred characters into the session and UI, so character tags (e.g., Dorothy Gale) display after using “Ask AI” to add a character.
+- **Needs Testing:** Add a new empty shot, ask the agent to add a main character, and confirm the character tag renders on the card.

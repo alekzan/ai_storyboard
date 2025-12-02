@@ -29,6 +29,7 @@ const els = {
   ingestBtn: document.getElementById("ingest-btn"),
   ingestStatus: document.getElementById("ingest-status"),
   sessionPill: document.getElementById("session-pill"),
+  loadDemoBtn: document.getElementById("load-demo"),
   characterList: document.getElementById("character-list"),
   generateCharacters: document.getElementById("generate-characters"),
   sceneList: document.getElementById("scene-list"),
@@ -388,6 +389,36 @@ els.pingButton.addEventListener("click", async () => {
   }
 });
 
+const loadDemoSession = async () => {
+  if (!els.loadDemoBtn) return;
+  setLoading(els.loadDemoBtn, true, "Loading…");
+  if (els.ingestStatus) els.ingestStatus.textContent = "";
+  try {
+    const data = await postJson("/debug/load_fixture", { style: state.style });
+    state.script = data.script;
+    if (els.scriptInput) els.scriptInput.value = data.script;
+    setStyle(data.style || state.style);
+    state.characters = data.characters || [];
+    state.characterBaseline = Object.fromEntries(
+      state.characters.map((c) => [c.name, c.character_description])
+    );
+    state.characterAssets = [];
+    state.shots = [];
+    syncScenesState(data.scenes || [], [], { forceEditingAll: true });
+    setSession(data.session_id);
+    renderCharacters();
+    renderScenes();
+    renderShots();
+    setToast("Demo prompts loaded. Generate characters to continue.");
+  } catch (err) {
+    setToast(err.message || "Failed to load demo prompts", "error");
+  } finally {
+    setLoading(els.loadDemoBtn, false, "Load demo prompts");
+  }
+};
+
+els.loadDemoBtn?.addEventListener("click", loadDemoSession);
+
 els.scriptForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const script = els.scriptInput.value.trim();
@@ -707,7 +738,11 @@ els.editModalSend.addEventListener("click", async () => {
             ...sc,
             shots: sc.shots.map((sh) =>
               sh.shot_number === Number(shot)
-                ? { ...sh, shot_description: data.shot.shot_description }
+                ? {
+                    ...sh,
+                    shot_description: data.shot.shot_description,
+                    characters_in_shot: data.shot.characters_in_shot || sh.characters_in_shot,
+                  }
                 : sh
             ),
           }

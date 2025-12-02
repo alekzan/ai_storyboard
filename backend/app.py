@@ -21,6 +21,7 @@ from .schemas import (
     CharacterUpdateResponse,
     ShotUpdateRequest,
     ShotUpdateResponse,
+    FixtureLoadRequest,
 )
 from .services import (
     ScriptIngestionService,
@@ -30,6 +31,8 @@ from .services import (
     ShotEditService,
     SessionUpdateService,
 )
+from .fixtures.demo_session import demo_fixture
+from .session_store import session_store
 
 
 def create_app() -> FastAPI:
@@ -141,6 +144,30 @@ def create_app() -> FastAPI:
     )
     def update_shot(payload: ShotUpdateRequest):
         return session_update_service.update_shot(payload)
+
+    @app.post(
+        "/debug/load_fixture",
+        response_model=ScriptIngestionResponse,
+        tags=["debug"],
+        status_code=status.HTTP_201_CREATED,
+    )
+    def load_fixture(payload: FixtureLoadRequest = FixtureLoadRequest()):
+        """Load a predefined script/scene/shot plan without calling the LLM (debug helper)."""
+
+        data = demo_fixture(style=payload.style)
+        session = session_store.create_session(
+            script=data["script"],
+            style=data["style"],
+            characters=data["characters"],
+            scenes=data["scenes"],
+        )
+        return ScriptIngestionResponse(
+            session_id=session.session_id,
+            style=session.style,
+            script=session.script,
+            characters=session.characters,
+            scenes=session.scenes,
+        )
 
     return app
 

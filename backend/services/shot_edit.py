@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from fastapi import HTTPException, status
+import re
 
-from ..agent_structured_outputs import Scene, Shot
+from ..agent_structured_outputs import Scene, Shot, ShotAgentDecision
 from ..agent_tools import generate_shot_with_refs, refine_shot_with_refs
 from ..schemas import ShotAsset, ShotEditRequest, ShotEditResponse
 from ..session_store import SessionStore, session_store
@@ -35,12 +36,46 @@ class ShotEditService:
         return session, shot_asset, planned_shot
 
     def _infer_characters_in_text(self, description: str, session) -> list[str]:
+        """Fuzzy match character names in free text.
+
+        Accepts either the full name or any meaningful token (e.g., first name)
+        to support prompts that only mention "Dorothy" instead of "Dorothy Gale".
+        """
+
         lowered = description.lower()
         names: list[str] = []
         for character in session.characters:
-            if character.name.lower() in lowered:
+            full = character.name.lower()
+            tokens = [t for t in re.split(r"[\s\-]+", full) if len(t) > 2]
+            match_full = full in lowered
+            match_token = any(token in lowered for token in tokens)
+            if match_full or match_token:
                 names.append(character.name)
-        return names
+        # Preserve ordering but unique
+        seen = set()
+        ordered = []
+        for name in names:
+            if name in seen:
+                continue
+            seen.add(name)
+            ordered.append(name)
+        return ordered
+
+    def _strip_reference_hint(self, text: str) -> str:
+        """Remove LLM-side helper hints like '(use provided character reference)'."""
+
+        if not text:
+            return text
+        return re.sub(r"\s*\(.*?provided character reference.*?\)", "", text, flags=re.IGNORECASE).strip()
+
+    def _default_characters_if_single(self, session, current: list[str]) -> list[str]:
+        """If no characters inferred and there is a single known character, use it as a fallback."""
+
+        if current:
+            return current
+        if len(session.characters) == 1:
+            return [session.characters[0].name]
+        return current
 
     def _collect_references(self, session, characters: list[str]) -> list[str]:
         refs: list[str] = []
@@ -89,17 +124,12 @@ class ShotEditService:
                     use_reference_images=True,
                 )
 
-            new_description = (
-                decision.shot_description
-                or result.get("structured_prompt", {}).get("short_description")
-                or combined_description
-                or payload.user_request
-                or ""
+            new_description_raw = decision.shot_description or combined_description or payload.user_request or ""
+            new_description = self._strip_reference_hint(new_description_raw)
+            characters_in_shot = planned_shot.characters_in_shot or self._infer_characters_in_text(
+                new_description or combined_description, session
             )
-            characters_in_shot = (
-                planned_shot.characters_in_shot
-                or self._infer_characters_in_text(new_description or combined_description, session)
-            )
+            characters_in_shot = self._default_characters_if_single(session, characters_in_shot)
             references = (
                 self._collect_references(session, characters_in_shot) if characters_in_shot else []
             )
@@ -180,14 +210,10 @@ class ShotEditService:
         # Attempt to infer an updated character list from the agent-proposed description
         new_characters_in_shot = shot_asset.characters_in_shot
         if decision.shot_description:
-            session_character_names = [c.name for c in session.characters]
-            lowered_desc = decision.shot_description.lower()
-            inferred = []
-            for name in session_character_names:
-                if name.lower() in lowered_desc:
-                    inferred.append(name)
+            inferred = self._infer_characters_in_text(decision.shot_description, session)
             if inferred:
                 new_characters_in_shot = inferred
+        new_characters_in_shot = self._default_characters_if_single(session, new_characters_in_shot)
 
         if action not in {"refine", "generate"}:
             raise HTTPException(
@@ -241,13 +267,14 @@ class ShotEditService:
         # Prefer the agent-supplied full description; otherwise fall back to the edit text
         # or user request so the UI reflects the latest narrative without stacking
         # "Edit:" lines.
-        new_shot_description = (
+        new_shot_description_raw = (
             decision.shot_description
             or result.get("structured_prompt", {}).get("short_description")
             or (decision.edit_prompt if decision.action == "refine" else None)
             or (payload.user_request if decision.action == "generate" else None)
             or shot_asset.shot_description
         )
+        new_shot_description = self._strip_reference_hint(new_shot_description_raw)
 
         characters_in_shot_final = new_characters_in_shot or shot_asset.characters_in_shot
 

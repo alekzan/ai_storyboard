@@ -138,3 +138,9 @@ class ShotUpdateResponse(BaseModel):
         default=None,
         description="Optional list of shot assets after the update; included when renumbering occurs.",
     )
+
+
+class FixtureLoadRequest(BaseModel):
+    style: Literal["outline", "realistic", "3d", "anime"] = Field(
+        default="realistic", description="Optional style override for the debug fixture."
+    )

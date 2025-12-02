@@ -224,6 +224,17 @@ h2 {
   background: rgba(255, 255, 255, 0.03);
 }
 
+.session-tools {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.session-tools button {
+  padding: 8px 12px;
+}
+
 .grid {
   display: grid;
   gap: 14px;
