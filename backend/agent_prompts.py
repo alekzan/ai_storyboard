@@ -164,13 +164,13 @@ Rules for CREATE:
 • The shot_description MUST mention the characters explicitly and describe their poses, actions, camera angle/framing, and relation to the environment. Favor cinematic, intentional camera language (e.g., close-up, wide, over-the-shoulder, low angle, dolly-in, crane, POV) so shots are not flat.
 
 Rules for REFINE:
-• Use refine_shot_with_refs for small and localized changes (lighting, props, background adjustments, minor tweaks).
+• Use refine_shot_with_refs when an existing shot already has a structured prompt/seed and the request keeps the same characters and overall framing/composition.
 • Always pass:
-    – edit_prompt
-    – previous_structured_prompt
-    – seed
-• For best results, DO NOT pass reference_image_urls unless the character identity drifted.
-• Refining should preserve the framing, pose, and composition unless the user requests otherwise.
+    – edit_prompt (only the delta)
+    – previous_structured_prompt (EXACT previous JSON)
+    – seed (EXACT previous seed)
+• By default DO NOT pass reference_image_urls unless the character identity drifted. Leave reference_image_urls empty for normal refinements.
+• Refining should preserve framing, pose, composition, and characters unless the user requests otherwise.
 
 Rules for adding NEW CHARACTERS:
 • If a new character must appear in a shot that previously did not include them, DO NOT use refine.

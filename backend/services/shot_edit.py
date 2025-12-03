@@ -114,6 +114,8 @@ class ShotEditService:
                     seed=0,
                     characters_in_shot=planned_shot.characters_in_shot,
                     style=session.style,
+                    characters_catalog=[c.name for c in session.characters],
+                    has_asset=False,
                 )
             except RuntimeError:
                 # Fall back to a simple generate path if the agent fails
@@ -130,9 +132,11 @@ class ShotEditService:
                 new_description or combined_description, session
             )
             characters_in_shot = self._default_characters_if_single(session, characters_in_shot)
-            references = (
-                self._collect_references(session, characters_in_shot) if characters_in_shot else []
-            )
+            use_refs_flag = decision.use_reference_images
+            if use_refs_flag is True:
+                references = self._collect_references(session, characters_in_shot) if characters_in_shot else []
+            else:
+                references = []
 
             try:
                 result = generate_shot_with_refs(
@@ -196,6 +200,8 @@ class ShotEditService:
                 seed=shot_asset.seed,
                 characters_in_shot=shot_asset.characters_in_shot,
                 style=session.style,
+                characters_catalog=[c.name for c in session.characters],
+                has_asset=True,
             )
         except RuntimeError as exc:
             raise HTTPException(
@@ -243,8 +249,8 @@ class ShotEditService:
                 ) from exc
         else:
             description = decision.shot_description or f"{shot_asset.shot_description}. {payload.user_request}"
-            # if the agent implied new characters, use that list to collect references
-            if new_characters_in_shot and (use_refs_flag is not False):
+            # if the agent implied new characters, use that list to collect references only when requested
+            if new_characters_in_shot and (use_refs_flag is True):
                 references = self._collect_references(session, new_characters_in_shot)
 
             try:

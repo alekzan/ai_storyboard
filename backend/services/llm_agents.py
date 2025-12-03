@@ -118,6 +118,8 @@ def run_shot_agent(
     seed: int,
     characters_in_shot: List[str],
     style: str,
+    characters_catalog: List[str] | None = None,
+    has_asset: bool | None = None,
 ) -> ShotAgentDecision:
     schema = json.dumps(ShotAgentDecision.model_json_schema(), indent=2)
     context = {
@@ -127,6 +129,8 @@ def run_shot_agent(
         "previous_structured_prompt": previous_structured_prompt,
         "user_request": user_request,
         "style": style,
+        "available_characters": characters_catalog or [],
+        "has_existing_asset": has_asset,
     }
     user_prompt = (
         "Decide whether to refine or regenerate this shot. Respond ONLY with JSON matching the schema.\n"
