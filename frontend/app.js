@@ -1,4 +1,5 @@
 const state = {
+  backendUrl: "http://localhost:8000",
   sessionId: null,
   style: "realistic",
   script: "",
@@ -19,10 +20,10 @@ const state = {
   charErrors: {},
 };
 
+const CACHE_KEY = "storyboard-cache-v1";
+let isHydrating = false;
+
 const els = {
-  backendUrl: document.getElementById("backend-url"),
-  pingButton: document.getElementById("ping-backend"),
-  health: document.getElementById("health-status"),
   scriptForm: document.getElementById("script-form"),
   scriptInput: document.getElementById("script-input"),
   styleOptions: document.getElementById("style-options"),
@@ -62,7 +63,7 @@ const setToast = (message, tone = "info") => {
   requestAnimationFrame(() => els.toast.classList.remove("hidden"));
 };
 
-const backendBase = () => els.backendUrl.value.replace(/\/$/, "");
+const backendBase = () => state.backendUrl.replace(/\/$/, "");
 
 const setStyle = (style) => {
   state.style = style;
@@ -89,12 +90,65 @@ const postJson = (path, body) =>
     body: JSON.stringify(body),
   }).then(asJson);
 
+const saveCache = () => {
+  if (isHydrating) return;
+  try {
+    const payload = {
+      backendUrl: state.backendUrl,
+      sessionId: state.sessionId,
+      style: state.style,
+      script: state.script,
+      characters: state.characters,
+      scenes: state.scenes,
+      characterAssets: state.characterAssets,
+      shots: state.shots,
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
+  } catch (e) {
+    // ignore cache errors
+  }
+};
+
+const loadCache = () => {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY);
+    if (!raw) return false;
+    const data = JSON.parse(raw);
+    isHydrating = true;
+    state.backendUrl = data.backendUrl || state.backendUrl;
+    state.sessionId = data.sessionId || null;
+    state.style = data.style || state.style;
+    state.script = data.script || "";
+    state.characters = data.characters || [];
+    state.characterAssets = data.characterAssets || [];
+    state.shots = data.shots || [];
+    state.characterBaseline = Object.fromEntries(
+      (state.characters || []).map((c) => [c.name, c.character_description])
+    );
+    if (els.scriptInput && state.script) {
+      els.scriptInput.value = state.script;
+    }
+    setStyle(state.style);
+    if (state.sessionId) setSession(state.sessionId);
+    syncScenesState(data.scenes || [], data.shot_assets || data.shots || [], { forceEditingAll: true });
+    renderCharacters();
+    renderScenes();
+    renderShots();
+    return true;
+  } catch (e) {
+    return false;
+  } finally {
+    isHydrating = false;
+  }
+};
+
 const setSession = (sessionId) => {
   state.sessionId = sessionId;
   els.sessionPill.textContent = sessionId ? `Session: ${sessionId}` : "No session yet";
   if (els.generateCharacters) els.generateCharacters.disabled = !sessionId;
   if (els.generateShotsAll) els.generateShotsAll.disabled = !sessionId || !allCharactersReady() || state.shotBulkGenerating;
   if (!sessionId && els.ingestStatus) els.ingestStatus.textContent = "";
+  saveCache();
 };
 
 const syncScenesState = (scenes, shotAssets, { forceEditingAll = false } = {}) => {
@@ -132,6 +186,7 @@ const syncScenesState = (scenes, shotAssets, { forceEditingAll = false } = {}) =
     });
   });
   state.shotEditing = nextEditing;
+  saveCache();
 };
 
 const applyShotUpdateResponse = (data, options) => {
@@ -372,22 +427,6 @@ const closeLightbox = () => {
   els.lightboxImage.src = "";
 };
 
-els.pingButton.addEventListener("click", async () => {
-  els.health.textContent = "checking...";
-  try {
-    const res = await fetch(`${backendBase()}/health`);
-    const json = await asJson(res);
-    const parts = [json.status, json.environment].filter(Boolean).join(" · ");
-    els.health.textContent = parts || "ok";
-    els.health.classList.remove("pill-muted");
-    setToast("Backend reachable");
-  } catch (err) {
-    els.health.textContent = "offline";
-    els.health.classList.add("pill-muted");
-    setToast(err.message || "Ping failed", "error");
-  }
-});
-
 els.scriptForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   const script = els.scriptInput.value.trim();
@@ -407,6 +446,7 @@ els.scriptForm.addEventListener("submit", async (e) => {
     state.characterAssets = [];
     state.shots = [];
     syncScenesState(data.scenes || [], [], { forceEditingAll: true });
+    saveCache();
     setSession(data.session_id);
     renderCharacters();
     renderScenes();
@@ -480,6 +520,7 @@ els.generateCharacters.addEventListener("click", async () => {
             const others = state.characterAssets.filter((c) => c.name !== name);
             state.characterAssets = [...others, asset];
             state.charErrors[name] = undefined;
+            saveCache();
           }
         } catch (err) {
           state.charErrors[name] = err.message || "Generation failed.";
@@ -496,6 +537,7 @@ els.generateCharacters.addEventListener("click", async () => {
     } else {
       setToast("Characters generated.");
     }
+    saveCache();
   } catch (err) {
     setToast(err.message || "Failed to generate characters", "error");
   } finally {
@@ -627,6 +669,7 @@ els.characterList.addEventListener("click", async (e) => {
       const others = state.characterAssets.filter((c) => c.name !== name);
       state.characterAssets = [...others, ...(data.characters || [])];
       state.charErrors[name] = undefined;
+      saveCache();
       state.charLoading.delete(name);
       renderCharacters();
       renderShots();
@@ -689,11 +732,11 @@ els.editModalSend.addEventListener("click", async () => {
   renderShots();
   // Close immediately to free space; request continues in background.
   closeEditModal();
-  try {
-    const data = await postJson("/shots/edit", {
-      session_id: state.sessionId,
-      scene_number: Number(scene),
-      shot_number: Number(shot),
+    try {
+      const data = await postJson("/shots/edit", {
+        session_id: state.sessionId,
+        scene_number: Number(scene),
+        shot_number: Number(shot),
       user_request: userRequest,
     });
     state.shots = state.shots.filter(
@@ -718,6 +761,7 @@ els.editModalSend.addEventListener("click", async () => {
         : sc
     );
     state.shotBaseline[key] = data.shot.shot_description;
+    saveCache();
     renderShots();
     setToast(`Shot ${shot} updated (${data.decision}).`);
   } catch (err) {
@@ -887,6 +931,7 @@ els.shotGrid.addEventListener("click", async (e) => {
       state.shots.push(data.shot);
       state.shotEditing.delete(key);
       state.shotLoading.delete(key);
+      saveCache();
       renderShots();
       setToast(`Generated scene ${sceneNum} shot ${shotNum}.`);
     } catch (err) {
@@ -911,7 +956,10 @@ els.lightboxBackdrop.addEventListener("click", (e) => {
   if (e.target === els.lightboxBackdrop) closeLightbox();
 });
 
-// Initial render
-renderCharacters();
-renderScenes();
-renderShots();
+// Hydrate from cache if available, otherwise render fresh
+const hydrated = loadCache();
+if (!hydrated) {
+  renderCharacters();
+  renderScenes();
+  renderShots();
+}

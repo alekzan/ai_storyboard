@@ -74,12 +74,13 @@
 - **Needs Testing:** Click “Load demo prompts,” then generate characters/shots and run agent edits to ensure the shortcut session behaves the same as a freshly ingested one.
 - **Next:** Remove or replace with selectable fixtures once debugging is done.
 
-## 2025-12-02
-
-- **Completed:** Removed the “Load demo prompts” UI button to avoid shortcut usage in the main flow.
-- **Completed:** Swapped the storyboard UI to light mode (panels, cards, add buttons, toasts) to support export-friendly layouts while keeping accent highlights.
-
 ## 2025-12-01 (shot agent tags)
 
 - **Completed:** Agent-generated shots created from empty cards now persist inferred characters into the session and UI, so character tags (e.g., Dorothy Gale) display after using “Ask AI” to add a character.
 - **Needs Testing:** Add a new empty shot, ask the agent to add a main character, and confirm the character tag renders on the card.
+
+## 2025-12-02
+
+- **Completed:** Removed the “Load demo prompts” UI button to avoid shortcut usage in the main flow.
+- **Completed:** Swapped the storyboard UI to light mode (panels, cards, add buttons, toasts) to support export-friendly layouts while keeping accent highlights.
+- **Completed:** Added client-side caching with localStorage to restore session/script/style/characters/scenes/shots after a page reload (while backend process remains alive). Removed the header health/ping controls for production readiness.
