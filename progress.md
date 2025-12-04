@@ -84,3 +84,4 @@
 - **Completed:** Removed the “Load demo prompts” UI button to avoid shortcut usage in the main flow.
 - **Completed:** Swapped the storyboard UI to light mode (panels, cards, add buttons, toasts) to support export-friendly layouts while keeping accent highlights.
 - **Completed:** Added client-side caching with localStorage to restore session/script/style/characters/scenes/shots after a page reload (while backend process remains alive). Removed the header health/ping controls for production readiness.
+- **Completed:** Added user-provided API key support (OpenAI & Bria) via per-request overrides with a “1” sentinel to use server .env keys; frontend accepts keys locally (not stored server-side), and backend plumbs tokens through all LLM/Bria calls.

@@ -1,4 +1,4 @@
-const state = {
+const initialState = () => ({
   backendUrl: "http://localhost:8000",
   sessionId: null,
   style: "realistic",
@@ -18,7 +18,11 @@ const state = {
   shotRefineLoading: new Set(),
   shotBulkGenerating: false,
   charErrors: {},
-};
+  briaToken: "",
+  openaiToken: "",
+});
+
+const state = initialState();
 
 const CACHE_KEY = "storyboard-cache-v1";
 let isHydrating = false;
@@ -26,10 +30,16 @@ let isHydrating = false;
 const els = {
   scriptForm: document.getElementById("script-form"),
   scriptInput: document.getElementById("script-input"),
+  keysWarning: document.getElementById("keys-warning"),
   styleOptions: document.getElementById("style-options"),
   ingestBtn: document.getElementById("ingest-btn"),
   ingestStatus: document.getElementById("ingest-status"),
   sessionPill: document.getElementById("session-pill"),
+  resetSession: document.getElementById("reset-session"),
+  briaTokenInput: document.getElementById("bria-token"),
+  openaiTokenInput: document.getElementById("openai-token"),
+  saveKeys: document.getElementById("save-keys"),
+  apiKeysForm: document.getElementById("api-keys-form"),
   characterList: document.getElementById("character-list"),
   generateCharacters: document.getElementById("generate-characters"),
   sceneList: document.getElementById("scene-list"),
@@ -102,10 +112,30 @@ const saveCache = () => {
       scenes: state.scenes,
       characterAssets: state.characterAssets,
       shots: state.shots,
+      // API keys are intentionally NOT cached
     };
     localStorage.setItem(CACHE_KEY, JSON.stringify(payload));
   } catch (e) {
     // ignore cache errors
+  }
+};
+
+const updateIngestLock = () => {
+  const keysReady = !!state.openaiToken && !!state.briaToken;
+  if (els.scriptInput) {
+    els.scriptInput.disabled = !keysReady;
+  }
+  if (els.keysWarning) {
+    els.keysWarning.style.display = keysReady ? "none" : "block";
+  }
+  if (els.ingestBtn) {
+    if (state.sessionId) {
+      els.ingestBtn.disabled = true;
+      els.ingestBtn.textContent = "Ingested";
+    } else {
+      els.ingestBtn.disabled = !keysReady;
+      els.ingestBtn.textContent = keysReady ? "Ingest Script" : "Add API keys to ingest";
+    }
   }
 };
 
@@ -134,6 +164,7 @@ const loadCache = () => {
     renderCharacters();
     renderScenes();
     renderShots();
+    updateIngestLock();
     return true;
   } catch (e) {
     return false;
@@ -145,10 +176,14 @@ const loadCache = () => {
 const setSession = (sessionId) => {
   state.sessionId = sessionId;
   els.sessionPill.textContent = sessionId ? `Session: ${sessionId}` : "No session yet";
+  if (els.resetSession) {
+    els.resetSession.style.display = sessionId ? "inline-flex" : "none";
+  }
   if (els.generateCharacters) els.generateCharacters.disabled = !sessionId;
   if (els.generateShotsAll) els.generateShotsAll.disabled = !sessionId || !allCharactersReady() || state.shotBulkGenerating;
   if (!sessionId && els.ingestStatus) els.ingestStatus.textContent = "";
   saveCache();
+  updateIngestLock();
 };
 
 const syncScenesState = (scenes, shotAssets, { forceEditingAll = false } = {}) => {
@@ -422,6 +457,27 @@ const openLightbox = (src, alt) => {
   els.lightboxBackdrop.classList.add("show");
 };
 
+const clearCacheAndReset = () => {
+  localStorage.removeItem(CACHE_KEY);
+  const fresh = initialState();
+  Object.keys(state).forEach((k) => {
+    state[k] = fresh[k];
+  });
+  if (els.scriptInput) {
+    els.scriptInput.value = "";
+    els.scriptInput.disabled = false;
+  }
+  if (els.ingestBtn) {
+    els.ingestBtn.disabled = !state.openaiToken || !state.briaToken;
+    els.ingestBtn.textContent = state.openaiToken && state.briaToken ? "Ingest Script" : "Add API keys to ingest";
+  }
+  setStyle(state.style);
+  setSession(null);
+  renderCharacters();
+  renderScenes();
+  renderShots();
+};
+
 const closeLightbox = () => {
   els.lightboxBackdrop.classList.remove("show");
   els.lightboxImage.src = "";
@@ -429,6 +485,10 @@ const closeLightbox = () => {
 
 els.scriptForm.addEventListener("submit", async (e) => {
   e.preventDefault();
+  if (!state.openaiToken || !state.briaToken) {
+    setToast("Enter API keys first.", "error");
+    return;
+  }
   const script = els.scriptInput.value.trim();
   const style = state.style;
   if (!script) {
@@ -438,7 +498,7 @@ els.scriptForm.addEventListener("submit", async (e) => {
   if (els.ingestStatus) els.ingestStatus.textContent = "Ingesting script…";
   setLoading(els.ingestBtn, true, "Ingesting...");
   try {
-    const data = await postJson("/script", { script, style });
+    const data = await postJson("/script", { script, style, openai_api_key: state.openaiToken || undefined });
     state.script = data.script;
     setStyle(data.style || style);
     state.characters = data.characters || [];
@@ -448,6 +508,13 @@ els.scriptForm.addEventListener("submit", async (e) => {
     syncScenesState(data.scenes || [], [], { forceEditingAll: true });
     saveCache();
     setSession(data.session_id);
+    if (els.scriptInput) {
+      els.scriptInput.disabled = true;
+    }
+    if (els.ingestBtn) {
+      els.ingestBtn.disabled = true;
+      els.ingestBtn.textContent = "Ingested";
+    }
     renderCharacters();
     renderScenes();
     renderShots();
@@ -470,7 +537,41 @@ if (els.styleOptions) {
   setStyle(state.style);
 }
 
+els.briaTokenInput?.addEventListener("input", (e) => {
+  state.briaToken = e.target.value.trim();
+});
+
+els.openaiTokenInput?.addEventListener("input", (e) => {
+  state.openaiToken = e.target.value.trim();
+});
+
+els.resetSession?.addEventListener("click", () => {
+  const confirmReset = window.confirm(
+    "Starting a new script will clear all current scenes, shots, and images. Continue?"
+  );
+  if (!confirmReset) return;
+  clearCacheAndReset();
+});
+
+els.apiKeysForm?.addEventListener("submit", (e) => {
+  e.preventDefault();
+  const openai = (els.openaiTokenInput?.value || "").trim();
+  const bria = (els.briaTokenInput?.value || "").trim();
+  if (!openai || !bria) {
+    setToast("Enter both API keys to continue.", "error");
+    return;
+  }
+  state.openaiToken = openai;
+  state.briaToken = bria;
+  updateIngestLock();
+  setToast("API keys saved for this session.");
+});
+
 els.generateCharacters.addEventListener("click", async () => {
+  if (!state.openaiToken || !state.briaToken) {
+    setToast("Enter API keys first.", "error");
+    return;
+  }
   if (!state.sessionId) {
     setToast("Create a session first.", "error");
     return;
@@ -514,6 +615,7 @@ els.generateCharacters.addEventListener("click", async () => {
           const data = await postJson("/characters/generate", {
             session_id: state.sessionId,
             character_names: [name],
+            bria_api_token: state.briaToken || undefined,
           });
           const asset = (data.characters || [])[0];
           if (asset) {
@@ -549,6 +651,10 @@ els.generateCharacters.addEventListener("click", async () => {
 });
 
 els.generateShotsAll?.addEventListener("click", async () => {
+  if (!state.openaiToken || !state.briaToken) {
+    setToast("Enter API keys first.", "error");
+    return;
+  }
   if (!state.sessionId) {
     setToast("Create a session first.", "error");
     return;
@@ -599,6 +705,7 @@ els.generateShotsAll?.addEventListener("click", async () => {
         session_id: state.sessionId,
         scene_number: item.scene,
         shot_number: item.shot,
+        bria_api_token: state.briaToken || undefined,
       });
       state.shots = state.shots.filter(
         (s) => !(s.scene_number === data.shot.scene_number && s.shot_number === data.shot.shot_number)
@@ -665,6 +772,7 @@ els.characterList.addEventListener("click", async (e) => {
       const data = await postJson("/characters/generate", {
         session_id: state.sessionId,
         character_names: [name],
+        bria_api_token: state.briaToken || undefined,
       });
       const others = state.characterAssets.filter((c) => c.name !== name);
       state.characterAssets = [...others, ...(data.characters || [])];
@@ -733,11 +841,13 @@ els.editModalSend.addEventListener("click", async () => {
   // Close immediately to free space; request continues in background.
   closeEditModal();
     try {
-      const data = await postJson("/shots/edit", {
-        session_id: state.sessionId,
-        scene_number: Number(scene),
-        shot_number: Number(shot),
+    const data = await postJson("/shots/edit", {
+      session_id: state.sessionId,
+      scene_number: Number(scene),
+      shot_number: Number(shot),
       user_request: userRequest,
+      bria_api_token: state.briaToken || undefined,
+      openai_api_key: state.openaiToken || undefined,
     });
     state.shots = state.shots.filter(
       (s) => !(s.scene_number === data.shot.scene_number && s.shot_number === data.shot.shot_number)
@@ -823,6 +933,10 @@ els.shotGrid.addEventListener("click", async (e) => {
 
   const imgFrame = e.target.closest(".image-frame.shot-lg");
   if (imgFrame) {
+    if (!state.openaiToken || !state.briaToken) {
+      setToast("Enter API keys first.", "error");
+      return;
+    }
     const sceneNum = Number(imgFrame.dataset.scene);
     const shotNum = Number(imgFrame.dataset.shot);
     const key = `${sceneNum}:${shotNum}`;
@@ -891,6 +1005,10 @@ els.shotGrid.addEventListener("click", async (e) => {
 
   const genShotBtn = e.target.closest(".shot-generate");
   if (genShotBtn) {
+    if (!state.openaiToken || !state.briaToken) {
+      setToast("Enter API keys first.", "error");
+      return;
+    }
     const sceneNum = Number(genShotBtn.dataset.scene);
     const shotNum = Number(genShotBtn.dataset.shot);
     const key = `${sceneNum}:${shotNum}`;
@@ -924,6 +1042,7 @@ els.shotGrid.addEventListener("click", async (e) => {
         session_id: state.sessionId,
         scene_number: sceneNum,
         shot_number: shotNum,
+        bria_api_token: state.briaToken || undefined,
       });
       state.shots = state.shots.filter(
         (s) => !(s.scene_number === data.shot.scene_number && s.shot_number === data.shot.shot_number)
@@ -963,3 +1082,4 @@ if (!hydrated) {
   renderScenes();
   renderShots();
 }
+updateIngestLock();

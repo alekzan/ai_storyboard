@@ -80,7 +80,9 @@ def create_app() -> FastAPI:
     def ingest_script(payload: ScriptIngestionRequest):
         if not payload.script.strip():
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Script cannot be empty")
-        return ingestion_service.ingest_script(script=payload.script, style=payload.style)
+        return ingestion_service.ingest_script(
+            script=payload.script, style=payload.style, openai_api_key=payload.openai_api_key
+        )
 
     @app.post(
         "/characters/generate",

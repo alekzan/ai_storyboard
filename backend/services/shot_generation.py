@@ -88,6 +88,7 @@ class ShotGenerationService:
                         shot_description=shot_description,
                         style=session.style,
                         reference_image_urls=references,
+                        bria_api_token=payload.bria_api_token,
                     )
                 except RuntimeError as exc:
                     raise HTTPException(
@@ -137,6 +138,7 @@ class ShotGenerationService:
                 shot_description=shot_description,
                 style=session.style,
                 reference_image_urls=references,
+                bria_api_token=payload.bria_api_token,
             )
         except RuntimeError as exc:
             raise HTTPException(

@@ -14,9 +14,9 @@ class ScriptIngestionService:
     def __init__(self, store: SessionStore | None = None) -> None:
         self.store = store or session_store
 
-    def ingest_script(self, *, script: str, style: str) -> ScriptIngestionResponse:
+    def ingest_script(self, *, script: str, style: str, openai_api_key: str | None = None) -> ScriptIngestionResponse:
         try:
-            character_output = run_character_cast_agent(script, style)
+            character_output = run_character_cast_agent(script, style, openai_api_key=openai_api_key)
         except RuntimeError as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -24,7 +24,7 @@ class ScriptIngestionService:
             ) from exc
 
         try:
-            script_output = run_script_agent(script, character_output.characters, style)
+            script_output = run_script_agent(script, character_output.characters, style, openai_api_key=openai_api_key)
         except RuntimeError as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

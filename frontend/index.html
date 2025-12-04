@@ -4,21 +4,40 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Storyboard Maker</title>
+  <link rel="icon" type="image/svg+xml" href="./images/ai-storyboard-logo.svg" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&family=Work+Sans:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0" />
   <link rel="stylesheet" href="./styles.css" />
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
       <div class="brand">
-        <div class="dot"></div>
+        <img src="./images/ai-storyboard-logo.svg" alt="AI Storyboard Maker logo" class="brand-logo" />
         <div>
-          <h1>Storyboard Maker</h1>
+          <h1>AI Storyboard Maker</h1>
           <p>Script → Characters → Shots</p>
         </div>
       </div>
+      <form class="api-keys-header" id="api-keys-form">
+        <div class="api-keys-head">
+          <span>API keys</span>
+          <span class="muted small">Keys are used only in this session and are not stored.</span>
+        </div>
+        <div class="api-keys-row">
+          <label class="stack" style="gap:4px;">
+            <span class="small muted">OpenAI API key</span>
+            <input id="openai-token" type="password" placeholder="Enter key" autocomplete="off" required />
+          </label>
+          <label class="stack" style="gap:4px;">
+            <span class="small muted">BRIA API key</span>
+            <input id="bria-token" type="password" placeholder="Enter key" autocomplete="off" required />
+          </label>
+          <button type="submit" class="primary" id="save-keys">Save keys</button>
+        </div>
+      </form>
     </header>
 
     <main>
@@ -26,24 +45,31 @@
         <div class="panel-head">
           <div>
             <p class="eyebrow">Step 1</p>
-            <h2>Script & Style</h2>
+            <h2><span class="material-symbols-outlined icon-step">border_color</span> Script & Style</h2>
             <p class="muted">Paste a script, pick a style, and generate the scene + shot plan.</p>
           </div>
-          <div class="session-pill" id="session-pill">No session yet</div>
+          <div class="actions" style="gap:12px; align-items: center;">
+            <div class="session-pill" id="session-pill">No session yet</div>
+            <button type="button" class="ghost danger" id="reset-session" style="display:none;">New script (clears progress)</button>
+          </div>
         </div>
         <form id="script-form" class="grid two-cols">
           <label class="stack">
             <span>Script</span>
             <textarea id="script-input" placeholder="Paste or type your story..."></textarea>
+            <p class="muted small" id="keys-warning" style="margin:4px 0 0 0; color:#b91c1c; display:none;">
+              Enter both API keys above to start.
+            </p>
           </label>
           <div class="stack">
-            <label class="stack">
-              <span>Style</span>
-              <div id="style-options" class="style-grid">
-                <button type="button" class="style-option selected" data-style="realistic">
-                  <div class="style-thumb">
-                    <img src="./images/realistic_example.png" alt="Realistic style example" />
-                  </div>
+          <label class="stack">
+            <span>Select style</span>
+            <span class="muted small">This style applies to all characters and shots.</span>
+            <div id="style-options" class="style-grid">
+              <button type="button" class="style-option selected" data-style="realistic">
+                <div class="style-thumb">
+                  <img src="./images/realistic_example.png" alt="Realistic style example" />
+                </div>
                   <span>Realistic</span>
                 </button>
                 <button type="button" class="style-option" data-style="outline">
@@ -80,7 +106,7 @@
         <div class="panel-head">
           <div>
             <p class="eyebrow">Step 2</p>
-            <h2>Characters</h2>
+            <h2><span class="material-symbols-outlined icon-step">person_edit</span> Characters</h2>
             <p class="muted">Review detected characters. Generate visual references when ready.</p>
           </div>
           <div class="actions">
@@ -112,7 +138,7 @@
         <div class="panel-head">
           <div>
             <p class="eyebrow">Step 3</p>
-            <h2>Storyboard Grid</h2>
+            <h2><span class="material-symbols-outlined icon-step">grid_view</span> Storyboard Grid</h2>
             <p class="muted">View generated shots and send quick edit requests. The agent will refine or regenerate.</p>
           </div>
           <div class="actions">

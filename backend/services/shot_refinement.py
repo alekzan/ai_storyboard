@@ -56,6 +56,7 @@ class ShotRefinementService:
                 previous_structured_prompt=shot_asset.structured_prompt,
                 seed=shot_asset.seed,
                 reference_image_urls=references or None,
+                bria_api_token=payload.bria_api_token,
             )
         except RuntimeError as exc:
             raise HTTPException(

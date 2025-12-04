@@ -116,6 +116,7 @@ class ShotEditService:
                     style=session.style,
                     characters_catalog=[c.name for c in session.characters],
                     has_asset=False,
+                    openai_api_key=payload.openai_api_key,
                 )
             except RuntimeError:
                 # Fall back to a simple generate path if the agent fails
@@ -143,6 +144,7 @@ class ShotEditService:
                     shot_description=new_description,
                     style=session.style,
                     reference_image_urls=references,
+                    bria_api_token=payload.bria_api_token,
                 )
             except RuntimeError as exc:
                 raise HTTPException(
@@ -202,6 +204,7 @@ class ShotEditService:
                 style=session.style,
                 characters_catalog=[c.name for c in session.characters],
                 has_asset=True,
+                openai_api_key=payload.openai_api_key,
             )
         except RuntimeError as exc:
             raise HTTPException(
@@ -238,6 +241,7 @@ class ShotEditService:
                     previous_structured_prompt=shot_asset.structured_prompt,
                     seed=shot_asset.seed,
                     reference_image_urls=references or None,
+                    bria_api_token=payload.bria_api_token,
                 )
             except RuntimeError as exc:
                 raise HTTPException(
@@ -258,6 +262,7 @@ class ShotEditService:
                     shot_description=description,
                     style=session.style,
                     reference_image_urls=references,
+                    bria_api_token=payload.bria_api_token,
                 )
             except RuntimeError as exc:
                 raise HTTPException(

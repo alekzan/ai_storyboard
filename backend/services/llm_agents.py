@@ -18,11 +18,17 @@ from ..agent_structured_outputs import (
 from ..settings import get_settings
 
 
-def _get_client() -> OpenAI:
+def _get_client(api_key_override: str | None = None) -> OpenAI:
     settings = get_settings()
-    if not settings.openai_api_key:
+    api_key = settings.openai_api_key
+    if api_key_override:
+        if api_key_override == settings.demo_opt_in_value:
+            api_key = settings.openai_api_key
+        else:
+            api_key = api_key_override
+    if not api_key:
         raise RuntimeError("OPENAI_API_KEY is not configured")
-    return OpenAI(api_key=settings.openai_api_key)
+    return OpenAI(api_key=api_key)
 
 
 def _extract_output_text(resp: Any) -> str:
@@ -40,9 +46,9 @@ def _extract_output_text(resp: Any) -> str:
     return ""
 
 
-def _call_llm(system_prompt: str, user_prompt: str, *, force_json: bool = True) -> str:
+def _call_llm(system_prompt: str, user_prompt: str, *, force_json: bool = True, api_key_override: str | None = None) -> str:
     settings = get_settings()
-    client = _get_client()
+    client = _get_client(api_key_override)
     response_format = {"type": "json_object"} if force_json else None
     kwargs = {
         "model": settings.openai_model,
@@ -72,7 +78,7 @@ def _extract_json_block(text: str) -> str:
     return text
 
 
-def run_character_cast_agent(script: str, style: str) -> CharacterCastAgentOutput:
+def run_character_cast_agent(script: str, style: str, openai_api_key: str | None = None) -> CharacterCastAgentOutput:
     schema = json.dumps(CharacterCastAgentOutput.model_json_schema(), indent=2)
     user_prompt = (
         "Read the following script and respond ONLY with valid JSON conforming to the schema.\n"
@@ -81,7 +87,7 @@ def run_character_cast_agent(script: str, style: str) -> CharacterCastAgentOutpu
         f"Schema:\n{schema}\n\n"
         f"Script:\n" + script.strip()
     )
-    content = _call_llm(character_cast_agent_prompt.strip(), user_prompt, force_json=True)
+    content = _call_llm(character_cast_agent_prompt.strip(), user_prompt, force_json=True, api_key_override=openai_api_key)
     json_payload = _extract_json_block(content)
     try:
         return CharacterCastAgentOutput.model_validate_json(json_payload)
@@ -90,7 +96,7 @@ def run_character_cast_agent(script: str, style: str) -> CharacterCastAgentOutpu
         raise RuntimeError(f"Unable to parse character agent output: {exc}. Raw: {snippet}") from exc
 
 
-def run_script_agent(script: str, characters: List[CharacterInfo], style: str) -> ScriptAgentOutput:
+def run_script_agent(script: str, characters: List[CharacterInfo], style: str, openai_api_key: str | None = None) -> ScriptAgentOutput:
     schema = json.dumps(ScriptAgentOutput.model_json_schema(), indent=2)
     characters_json = json.dumps([c.model_dump() for c in characters], indent=2)
     user_prompt = (
@@ -101,7 +107,7 @@ def run_script_agent(script: str, characters: List[CharacterInfo], style: str) -
         f"Characters:\n{characters_json}\n\n"
         f"Script:\n{script.strip()}"
     )
-    content = _call_llm(script_agent_prompt.strip(), user_prompt, force_json=True)
+    content = _call_llm(script_agent_prompt.strip(), user_prompt, force_json=True, api_key_override=openai_api_key)
     json_payload = _extract_json_block(content)
     try:
         return ScriptAgentOutput.model_validate_json(json_payload)
@@ -120,6 +126,7 @@ def run_shot_agent(
     style: str,
     characters_catalog: List[str] | None = None,
     has_asset: bool | None = None,
+    openai_api_key: str | None = None,
 ) -> ShotAgentDecision:
     schema = json.dumps(ShotAgentDecision.model_json_schema(), indent=2)
     context = {
@@ -137,7 +144,7 @@ def run_shot_agent(
         f"Schema:\n{schema}\n\n"
         f"Context:\n{json.dumps(context, indent=2)}"
     )
-    content = _call_llm(shot_agent_prompt.strip(), user_prompt, force_json=True)
+    content = _call_llm(shot_agent_prompt.strip(), user_prompt, force_json=True, api_key_override=openai_api_key)
     json_payload = _extract_json_block(content)
     try:
         return ShotAgentDecision.model_validate_json(json_payload)

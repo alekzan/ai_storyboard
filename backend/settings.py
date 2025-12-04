@@ -18,6 +18,7 @@ class Settings(BaseModel):
     bria_api_token: str | None
     openai_api_key: str | None
     openai_model: str
+    demo_opt_in_value: str = "1"
 
     @property
     def bria_configured(self) -> bool:

@@ -13,6 +13,9 @@ class ScriptIngestionRequest(BaseModel):
     style: Literal["outline", "realistic", "3d", "anime"] = Field(
         default="realistic", description="Visual style applied across the project."
     )
+    openai_api_key: str | None = Field(
+        default=None, description="Optional override for OpenAI API key; '1' uses server default."
+    )
 
 
 class ScriptIngestionResponse(BaseModel):
@@ -34,6 +37,9 @@ class CharacterAsset(BaseModel):
 
 class CharacterGenerationRequest(BaseModel):
     session_id: str
+    bria_api_token: str | None = Field(
+        default=None, description="Optional override for Bria API token; '1' uses server default."
+    )
     character_names: Optional[List[str]] = Field(
         default=None,
         description="Optional subset of character names to generate; defaults to all main cast.",
@@ -58,6 +64,9 @@ class ShotAsset(BaseModel):
 
 class ShotGenerationRequest(BaseModel):
     session_id: str
+    bria_api_token: str | None = Field(
+        default=None, description="Optional override for Bria API token; '1' uses server default."
+    )
     scene_numbers: Optional[List[int]] = Field(
         default=None,
         description="Optional subset of scenes to process; defaults to all scenes in the session.",
@@ -73,6 +82,9 @@ class SingleShotGenerationRequest(BaseModel):
     session_id: str
     scene_number: int
     shot_number: int
+    bria_api_token: str | None = Field(
+        default=None, description="Optional override for Bria API token; '1' uses server default."
+    )
 
 
 class SingleShotGenerationResponse(BaseModel):
@@ -85,6 +97,9 @@ class ShotRefineRequest(BaseModel):
     scene_number: int
     shot_number: int
     edit_prompt: str = Field(..., description="What to change in the shot.")
+    bria_api_token: str | None = Field(
+        default=None, description="Optional override for Bria API token; '1' uses server default."
+    )
     use_reference_images: bool = Field(
         default=False,
         description="Optionally pass character reference images to the refine call if identity drifted.",
@@ -101,6 +116,12 @@ class ShotEditRequest(BaseModel):
     scene_number: int
     shot_number: int
     user_request: str = Field(..., description="Freeform user request to change the shot.")
+    openai_api_key: str | None = Field(
+        default=None, description="Optional override for OpenAI API key; '1' uses server default."
+    )
+    bria_api_token: str | None = Field(
+        default=None, description="Optional override for Bria API token; '1' uses server default."
+    )
 
 
 class ShotEditResponse(BaseModel):

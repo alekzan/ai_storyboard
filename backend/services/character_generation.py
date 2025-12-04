@@ -51,7 +51,9 @@ class CharacterGenerationService:
 
         def _generate(character):
             try:
-                result = generate_character(character.character_description, session.style)
+                result = generate_character(
+                    character.character_description, session.style, bria_api_token=payload.bria_api_token
+                )
                 return character, result
             except Exception as exc:  # pylint: disable=broad-except
                 # Convert to RuntimeError so outer handler can wrap as HTTPException

@@ -11,14 +11,28 @@ load_dotenv()
 
 BRIA_API_URL = "https://engine.prod.bria-api.com/v2/image/generate"
 BRIA_API_TOKEN = os.getenv("BRIA_API_TOKEN")  # put this in your .env
+DEMO_OPT_IN = os.getenv("DEMO_OPT_IN_VALUE", "1")
 
 
-def _bria_headers():
-    if not BRIA_API_TOKEN:
+def _resolve_token(override: str | None) -> str:
+    """Return override token unless demo opt-in is used, otherwise fall back to env."""
+
+    token = BRIA_API_TOKEN
+    if override:
+        if override == DEMO_OPT_IN:
+            token = BRIA_API_TOKEN
+        else:
+            token = override
+    if not token:
         raise RuntimeError("BRIA_API_TOKEN is not set in environment")
+    return token
+
+
+def _bria_headers(token: str | None = None):
+    resolved = _resolve_token(token)
     return {
         "Content-Type": "application/json",
-        "api_token": BRIA_API_TOKEN,
+        "api_token": resolved,
     }
 
 
@@ -96,6 +110,7 @@ def generate_character(
     character_description: str,
     style: str = "realistic",
     aspect_ratio: str = "9:16",
+    bria_api_token: str | None = None,
 ):
     """
     Create an initial character image.
@@ -118,7 +133,7 @@ def generate_character(
 
     print("⏳ Generating character...")
     try:
-        response = requests.post(BRIA_API_URL, json=payload, headers=_bria_headers(), timeout=60)
+        response = requests.post(BRIA_API_URL, json=payload, headers=_bria_headers(bria_api_token), timeout=60)
         response.raise_for_status()
     except requests.exceptions.RequestException as exc:  # includes timeouts and HTTP errors
         status = getattr(exc.response, "status_code", None)
@@ -147,6 +162,7 @@ def refine_character(
     previous_structured_prompt,
     seed: int,
     aspect_ratio: str = "9:16",
+    bria_api_token: str | None = None,
 ):
     """
     Refine an existing character.
@@ -173,7 +189,7 @@ def refine_character(
     }
 
     print("⏳ Refining character...")
-    response = requests.post(BRIA_API_URL, json=payload, headers=_bria_headers())
+    response = requests.post(BRIA_API_URL, json=payload, headers=_bria_headers(bria_api_token))
     if response.status_code >= 400:
         try:
             detail = response.json()
@@ -207,8 +223,9 @@ def refine_character(
 def generate_shot_with_refs(
     shot_description: str,
     style: str,
-    reference_image_urls,
+    reference_image_urls: list[str] | None = None,
     aspect_ratio: str = "16:9",
+    bria_api_token: str | None = None,
 ):
     """
     Generate a storyboard shot using one or more character reference images.
@@ -238,7 +255,7 @@ def generate_shot_with_refs(
         payload["images"] = images
 
     print("⏳ Generating shot with character reference...")
-    response = requests.post(BRIA_API_URL, json=payload, headers=_bria_headers())
+    response = requests.post(BRIA_API_URL, json=payload, headers=_bria_headers(bria_api_token))
     if response.status_code >= 400:
         try:
             detail = response.json()
@@ -268,8 +285,9 @@ def refine_shot_with_refs(
     edit_prompt: str,
     previous_structured_prompt,
     seed: int,
-    reference_image_urls=None,
+    reference_image_urls: list[str] | None = None,
     aspect_ratio: str = "16:9",
+    bria_api_token: str | None = None,
 ):
     """
     Refine an existing shot, optionally passing character reference images too.
@@ -306,7 +324,7 @@ def refine_shot_with_refs(
         payload["images"] = images
 
     print("⏳ Refining shot with character reference...")
-    response = requests.post(BRIA_API_URL, json=payload, headers=_bria_headers())
+    response = requests.post(BRIA_API_URL, json=payload, headers=_bria_headers(bria_api_token))
     if response.status_code >= 400:
         try:
             detail = response.json()
