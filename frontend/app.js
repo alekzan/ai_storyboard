@@ -10,6 +10,7 @@ const initialState = () => ({
   characterBaseline: {},
   shotBaseline: {},
   shotEditing: new Set(),
+  charEditing: new Set(),
   editTarget: null,
   lockedEdits: new Set(), // legacy lock; no longer used for agent locking
   shotAgentPending: new Set(),
@@ -247,24 +248,34 @@ const renderCharacters = () => {
       const asset = assetMap.get(c.name);
       const loading = state.charLoading.has(c.name);
       const warn = state.charErrors?.[c.name];
-      const imgBlock = asset
-        ? `<div class="image-wrapper">
-             <div class="image-frame portrait">
-               <img src="${asset.image_url}" alt="${c.name}" />
-             </div>
-             <div class="image-actions">
-               <a class="icon-btn" title="Download" href="${asset.image_url}" download target="_blank" rel="noreferrer"><span class="glyph">⤓</span></a>
-               <button class="icon-btn maximize-char" title="View larger" data-name="${c.name}"><span class="glyph">⤢</span></button>
-             </div>
-           </div>`
-        : `<div class="image-frame portrait ${loading ? "loading" : ""}">
-             ${loading ? "" : `<span class="muted small">Not generated yet</span>`}
-           </div>`;
+      const isEditing = state.charEditing.has(c.name) || !asset;
+      const imgBlock = loading
+        ? `<div class="image-frame portrait loading"></div>`
+        : asset
+          ? `<div class="image-wrapper">
+               <div class="image-frame portrait">
+                 <img src="${asset.image_url}" alt="${c.name}" />
+               </div>
+               <div class="image-actions">
+                 <a class="icon-btn download-btn" title="Download" href="${asset.image_url}" data-filename="${encodeURIComponent(
+                   `${c.name}.png`
+                 )}"><span class="glyph">⤓</span></a>
+                 <button class="icon-btn maximize-char" title="View larger" data-name="${c.name}"><span class="glyph">⤢</span></button>
+               </div>
+             </div>`
+          : `<div class="image-frame portrait">
+               <span class="muted small">Not generated yet</span>
+             </div>`;
       const description = c.character_description || asset?.description || "No description";
       const seedBadge = asset ? `<span class="badge">seed ${asset.seed}</span>` : "";
-      const readOnlyAttr = ""; // always editable
-      const buttons = `<div class="actions" style="justify-content: flex-end; gap: 8px;">
-             <button class="primary char-generate" type="button" data-name="${c.name}">Generate this character</button>
+      const readOnlyAttr = loading ? "readonly" : isEditing ? "" : "readonly";
+      const buttons = isEditing
+        ? `<div class="actions" style="justify-content: flex-end; gap: 8px;">
+             ${asset ? `<button class="ghost char-cancel" type="button" data-name="${c.name}" ${loading ? "disabled" : ""}>Cancel</button>` : ""}
+             <button class="primary char-generate" type="button" data-name="${c.name}" ${loading ? "disabled" : ""}>${loading ? "Generating..." : "Generate this character"}</button>
+           </div>`
+        : `<div class="actions" style="justify-content: flex-end; gap: 8px;">
+             <button class="ghost char-edit-toggle" type="button" data-name="${c.name}" ${loading ? "disabled" : ""}>Edit</button>
            </div>`;
       return `<article class="card">
         ${imgBlock}
@@ -273,7 +284,7 @@ const renderCharacters = () => {
             <h3>${c.name}</h3>
             ${seedBadge}
           </div>
-          <textarea class="char-edit" data-name="${c.name}" placeholder="Character prompt" ${readOnlyAttr}>${description}</textarea>
+          <textarea class="char-edit ${isEditing ? "editing" : "readonly"}" data-name="${c.name}" placeholder="Character prompt" ${readOnlyAttr}>${description}</textarea>
           ${warn ? `<div class="warning">Generation failed: ${warn}</div>` : ""}
           ${buttons}
         </div>
@@ -321,7 +332,9 @@ const renderShots = () => {
             : asset
               ? `<img src="${asset.image_url}" alt="Scene ${scene.scene_number} shot ${shot.shot_number}"/>
                  <div class="image-actions">
-                   <a class="icon-btn" title="Download" href="${asset.image_url}" download target="_blank" rel="noreferrer"><span class="glyph">⤓</span></a>
+                   <a class="icon-btn download-btn" title="Download" href="${asset.image_url}" data-filename="${encodeURIComponent(
+                     `scene-${scene.scene_number}-shot-${shot.shot_number}.png`
+                   )}"><span class="glyph">⤓</span></a>
                    <button class="icon-btn maximize" title="View larger" data-scene="${scene.scene_number}" data-shot="${shot.shot_number}"><span class="glyph">⤢</span></button>
                  </div>`
               : `<span class="muted small">Not generated yet</span>`
@@ -457,6 +470,24 @@ const openLightbox = (src, alt) => {
   els.lightboxBackdrop.classList.add("show");
 };
 
+const triggerDownload = async (url, filename = "image.png") => {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Download failed (${res.status})`);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(blobUrl);
+  } catch (err) {
+    setToast(err.message || "Download failed", "error");
+  }
+};
+
 const clearCacheAndReset = () => {
   localStorage.removeItem(CACHE_KEY);
   const fresh = initialState();
@@ -503,6 +534,9 @@ els.scriptForm.addEventListener("submit", async (e) => {
     setStyle(data.style || style);
     state.characters = data.characters || [];
     state.characterBaseline = Object.fromEntries(state.characters.map((c) => [c.name, c.character_description]));
+    state.charEditing = new Set();
+    state.charErrors = {};
+    state.charLoading = new Set();
     state.characterAssets = [];
     state.shots = [];
     syncScenesState(data.scenes || [], [], { forceEditingAll: true });
@@ -622,6 +656,7 @@ els.generateCharacters.addEventListener("click", async () => {
             const others = state.characterAssets.filter((c) => c.name !== name);
             state.characterAssets = [...others, asset];
             state.charErrors[name] = undefined;
+            state.charEditing.delete(name);
             saveCache();
           }
         } catch (err) {
@@ -747,6 +782,39 @@ els.characterList.addEventListener("click", async (e) => {
     if (asset?.image_url) openLightbox(asset.image_url, name);
     return;
   }
+  const downloadBtn = e.target.closest(".download-btn");
+  if (downloadBtn) {
+    e.preventDefault();
+    const url = downloadBtn.getAttribute("href");
+    const filename = decodeURIComponent(downloadBtn.dataset.filename || "image.png");
+    triggerDownload(url, filename);
+    return;
+  }
+  const editToggle = e.target.closest(".char-edit-toggle");
+  if (editToggle) {
+    const name = editToggle.dataset.name;
+    state.charEditing.add(name);
+    renderCharacters();
+    const textarea = document.querySelector(`.char-edit[data-name="${name}"]`);
+    if (textarea) {
+      textarea.removeAttribute("readonly");
+      textarea.classList.add("editing");
+      textarea.focus();
+      textarea.setSelectionRange(0, 0);
+    }
+    return;
+  }
+  const cancelBtn = e.target.closest(".char-cancel");
+  if (cancelBtn) {
+    const name = cancelBtn.dataset.name;
+    const baseline = state.characterBaseline[name] || "";
+    state.characters = state.characters.map((c) =>
+      c.name === name ? { ...c, character_description: baseline } : c
+    );
+    state.charEditing.delete(name);
+    renderCharacters();
+    return;
+  }
   const genBtn = e.target.closest(".char-generate");
   if (genBtn) {
     const name = genBtn.dataset.name;
@@ -777,6 +845,7 @@ els.characterList.addEventListener("click", async (e) => {
       const others = state.characterAssets.filter((c) => c.name !== name);
       state.characterAssets = [...others, ...(data.characters || [])];
       state.charErrors[name] = undefined;
+      state.charEditing.delete(name);
       saveCache();
       state.charLoading.delete(name);
       renderCharacters();
@@ -931,8 +1000,31 @@ els.shotGrid.addEventListener("click", async (e) => {
     return;
   }
 
+  const downloadBtn = e.target.closest(".download-btn");
+  if (downloadBtn) {
+    e.preventDefault();
+    const url = downloadBtn.getAttribute("href");
+    const filename = decodeURIComponent(downloadBtn.dataset.filename || "image.png");
+    triggerDownload(url, filename);
+    return;
+  }
+
+  const maximizeBtn = e.target.closest(".maximize");
+  if (maximizeBtn) {
+    const sceneNum = Number(maximizeBtn.dataset.scene);
+    const shotNum = Number(maximizeBtn.dataset.shot);
+    const asset = state.shots.find(
+      (s) => s.scene_number === sceneNum && s.shot_number === shotNum
+    );
+    if (asset?.image_url) openLightbox(asset.image_url, `Scene ${sceneNum} Shot ${shotNum}`);
+    return;
+  }
+
   const imgFrame = e.target.closest(".image-frame.shot-lg");
   if (imgFrame) {
+    if (e.target.closest(".icon-btn")) {
+      return;
+    }
     if (!state.openaiToken || !state.briaToken) {
       setToast("Enter API keys first.", "error");
       return;
@@ -947,17 +1039,6 @@ els.shotGrid.addEventListener("click", async (e) => {
     }
     if (state.shotAgentPending.has(key)) return;
     openEditModal(sceneNum, shotNum);
-    return;
-  }
-
-  const maximizeBtn = e.target.closest(".maximize");
-  if (maximizeBtn) {
-    const sceneNum = Number(maximizeBtn.dataset.scene);
-    const shotNum = Number(maximizeBtn.dataset.shot);
-    const asset = state.shots.find(
-      (s) => s.scene_number === sceneNum && s.shot_number === shotNum
-    );
-    if (asset?.image_url) openLightbox(asset.image_url, `Scene ${sceneNum} Shot ${shotNum}`);
     return;
   }
 
