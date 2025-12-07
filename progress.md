@@ -93,3 +93,10 @@
 - **Next:** Continue existing UI polish tasks (persist state across reloads, character refine controls) after verifying the sample flow works as expected.
 - **Completed:** Set the script textarea to 450px tall on desktop while keeping a shorter height on mobile, and stacked the API key inputs on small screens to prevent overflow.
 - **Completed:** Improved the ingest loader dots to a larger, staggered bounce animation for better visibility under the Step 1 button.
+
+## 2025-12-07 (deployment)
+
+- **Completed:** Made the frontend default backend URL environment-aware (local runs use http://localhost:8000, deployed instances call `${origin}/api`) to support the Nginx reverse proxy.
+- **Completed:** Provisioned the DigitalOcean droplet at 64.23.197.176 with a systemd-managed uvicorn service, Nginx serving the frontend and proxying `/api` to the backend, plus a systemd timer that pulls `origin/main` from GitHub every minute, installs deps, and restarts the service when changes appear.
+- **Needs Testing:** Hit http://64.23.197.176 to confirm the UI loads and API calls succeed with valid keys; verify the updater picks up a new push (check `systemctl status ai_storyboard_update.timer` on the droplet or run `/opt/ai_storyboard/deploy.sh`).
+- **Next:** Add HTTPS via Let’s Encrypt and populate `/opt/ai_storyboard/.env` with real OpenAI/BRIA keys for production use.

@@ -1,5 +1,13 @@
+const defaultBackendUrl = (() => {
+  if (typeof window === "undefined") return "http://localhost:8000";
+  const { origin, hostname, protocol } = window.location;
+  const isLocal = protocol === "file:" || hostname === "localhost" || hostname === "127.0.0.1";
+  if (isLocal) return "http://localhost:8000";
+  return `${origin}/api`;
+})();
+
 const initialState = () => ({
-  backendUrl: "http://localhost:8000",
+  backendUrl: defaultBackendUrl,
   sessionId: null,
   style: "realistic",
   script: "",
