@@ -85,3 +85,11 @@
 - **Completed:** Swapped the storyboard UI to light mode (panels, cards, add buttons, toasts) to support export-friendly layouts while keeping accent highlights.
 - **Completed:** Added client-side caching with localStorage to restore session/script/style/characters/scenes/shots after a page reload (while backend process remains alive). Removed the header health/ping controls for production readiness.
 - **Completed:** Added user-provided API key support (OpenAI & Bria) via per-request overrides with a “1” sentinel to use server .env keys; frontend accepts keys locally (not stored server-side), and backend plumbs tokens through all LLM/Bria calls.
+
+## 2025-12-06
+
+- **Completed:** Added a Step 1 “Load sample script” button that preloads the provided Dorothy/Toto porch scene into the script textarea on demand (without auto-showing it) and updates cached state for quick ingesting. Moved it directly under the Step 1 heading for visibility and increased the script textarea height to align with the ingest controls.
+- **Needs Testing:** Click “Load sample script” then ingest to confirm it fills the textarea only when requested, honors API key gating, and stays disabled once a session is active until reset.
+- **Next:** Continue existing UI polish tasks (persist state across reloads, character refine controls) after verifying the sample flow works as expected.
+- **Completed:** Set the script textarea to 450px tall on desktop while keeping a shorter height on mobile, and stacked the API key inputs on small screens to prevent overflow.
+- **Completed:** Improved the ingest loader dots to a larger, staggered bounce animation for better visibility under the Step 1 button.

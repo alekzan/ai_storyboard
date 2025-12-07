@@ -23,6 +23,8 @@ const initialState = () => ({
   openaiToken: "",
 });
 
+const SAMPLE_SCRIPT = `A restless wind swept across the flat Kansas prairie as young Dorothy Gale stepped out onto the worn wooden porch of her aunt's farmhouse, Toto trotting at her heels with alert, curious eyes. The fading sun cast long shadows over the endless fields, making the distant horizon feel both familiar and impossibly far away. Inside, Aunt Em moved quietly through the kitchen, pausing now and then to glance at the trembling windowpanes as the gusts grew sharper by the minute. Yet Dorothy lingered outside, hugging Toto close as the wind tugged at her hair and something unspoken stirred in her chest, a sense that the ordinary world around her was shifting by the second. The camera stayed with her on that creaking porch, the calm before a storm none of them had yet named.`;
+
 const state = initialState();
 
 const CACHE_KEY = "storyboard-cache-v1";
@@ -56,6 +58,7 @@ const els = {
   lightboxBackdrop: document.getElementById("lightbox-backdrop"),
   lightboxImage: document.getElementById("lightbox-image"),
   lightboxClose: document.getElementById("lightbox-close"),
+  loadSampleScript: document.getElementById("load-sample-script"),
 };
 
 const allCharactersReady = () => {
@@ -179,6 +182,10 @@ const setSession = (sessionId) => {
   els.sessionPill.textContent = sessionId ? `Session: ${sessionId}` : "No session yet";
   if (els.resetSession) {
     els.resetSession.style.display = sessionId ? "inline-flex" : "none";
+  }
+  if (els.loadSampleScript) {
+    els.loadSampleScript.disabled = !!sessionId;
+    els.loadSampleScript.title = sessionId ? "Reset session to load a new sample script." : "";
   }
   if (els.generateCharacters) els.generateCharacters.disabled = !sessionId;
   if (els.generateShotsAll) els.generateShotsAll.disabled = !sessionId || !allCharactersReady() || state.shotBulkGenerating;
@@ -514,6 +521,22 @@ const closeLightbox = () => {
   els.lightboxImage.src = "";
 };
 
+const loadSampleIntoForm = () => {
+  if (!els.scriptInput || state.sessionId) return;
+  if (els.scriptInput.value.trim()) {
+    const replace = window.confirm("Replace the current script with the sample script?");
+    if (!replace) return;
+  }
+  const sample = SAMPLE_SCRIPT.trim();
+  els.scriptInput.value = sample;
+  state.script = sample;
+  saveCache();
+  setToast("Loaded sample script. You can ingest it now.");
+  if (!els.scriptInput.disabled) {
+    els.scriptInput.focus();
+  }
+};
+
 els.scriptForm.addEventListener("submit", async (e) => {
   e.preventDefault();
   if (!state.openaiToken || !state.briaToken) {
@@ -585,6 +608,14 @@ els.resetSession?.addEventListener("click", () => {
   );
   if (!confirmReset) return;
   clearCacheAndReset();
+});
+
+els.loadSampleScript?.addEventListener("click", () => {
+  if (state.sessionId) {
+    setToast("Start a new script to load the sample.", "error");
+    return;
+  }
+  loadSampleIntoForm();
 });
 
 els.apiKeysForm?.addEventListener("submit", (e) => {
