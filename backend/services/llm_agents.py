@@ -32,17 +32,25 @@ def _get_client(api_key_override: str | None = None) -> OpenAI:
 
 
 def _extract_output_text(resp: Any) -> str:
-    # Prefer the convenience property if present
+    # New Responses API (has output_text/output fields)
     if hasattr(resp, "output_text") and resp.output_text:
         return resp.output_text
 
-    # Fallback: scan output array for message content with output_text entries
     output = getattr(resp, "output", None) or []
     for item in output:
         if item.get("type") == "message":
             for content in item.get("content", []):
                 if content.get("type") == "output_text":
                     return content.get("text", "")
+
+    # Legacy Chat Completions
+    choices = getattr(resp, "choices", None)
+    if choices:
+        first = choices[0]
+        msg = getattr(first, "message", None)
+        if msg and getattr(msg, "content", None):
+            return msg.content
+
     return ""
 
 
@@ -50,21 +58,29 @@ def _call_llm(system_prompt: str, user_prompt: str, *, force_json: bool = True, 
     settings = get_settings()
     client = _get_client(api_key_override)
     response_format = {"type": "json_object"} if force_json else None
-    kwargs = {
-        "model": settings.openai_model,
-        "input": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-    }
-    if response_format:
-        kwargs["response_format"] = response_format
-    try:
-        response = client.responses.create(**kwargs)
-    except TypeError:
-        # Fallback for older openai SDK versions that don't support response_format
-        kwargs.pop("response_format", None)
-        response = client.responses.create(**kwargs)
+
+    system_user_messages = [
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_prompt},
+    ]
+
+    # Prefer Responses API if available
+    if hasattr(client, "responses"):
+        kwargs = {"model": settings.openai_model, "input": system_user_messages}
+        if response_format:
+            kwargs["response_format"] = response_format
+        try:
+            response = client.responses.create(**kwargs)
+        except TypeError:
+            # Older responses.create without response_format
+            kwargs.pop("response_format", None)
+            response = client.responses.create(**kwargs)
+        return _extract_output_text(response)
+
+    # Fallback to legacy chat.completions
+    kwargs = {"model": settings.openai_model, "messages": system_user_messages}
+    # response_format is not supported on older chat endpoints; omit to avoid errors
+    response = client.chat.completions.create(**kwargs)
     return _extract_output_text(response)
 
 
