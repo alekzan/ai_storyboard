@@ -100,3 +100,4 @@
 - **Completed:** Provisioned the DigitalOcean droplet at 64.23.197.176 with a systemd-managed uvicorn service, Nginx serving the frontend and proxying `/api` to the backend, plus a systemd timer that pulls `origin/main` from GitHub every minute, installs deps, and restarts the service when changes appear.
 - **Needs Testing:** Hit http://64.23.197.176 to confirm the UI loads and API calls succeed with valid keys; verify the updater picks up a new push (check `systemctl status ai_storyboard_update.timer` on the droplet or run `/opt/ai_storyboard/deploy.sh`).
 - **Next:** Add HTTPS via Let’s Encrypt and populate `/opt/ai_storyboard/.env` with real OpenAI/BRIA keys for production use.
+- **Fix:** Pinned `httpx` to <0.28 to stay compatible with the OpenAI SDK; newer `httpx` removed `proxies` kwargs, causing /script ingestion to 500. Re-deploy with updated requirements.
