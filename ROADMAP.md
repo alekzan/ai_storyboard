@@ -136,6 +136,7 @@ Each step must be completed before moving to the next.
 
 ---
 
+## NOTE: Steps 8 and 9 are already done!
 ## 8. Final Demo Prep
 - Prepare example scripts  
 - Prepare sample outputs in various styles  
