@@ -52,9 +52,7 @@ Environment variables (`.env`):
 
 ## Deployment (current)
 - Repo: `alekzan/ai_storyboard` (main).  
-- Droplet: 64.23.197.176 with Nginx → uvicorn on :8000.  
-- TLS: Let’s Encrypt via certbot for `fibo.autoflujo.com`.  
-- Auto-deploy: systemd timer runs `/opt/ai_storyboard/deploy.sh` every minute to pull `origin/main`, install deps, and restart the service on changes.
+- Deployed on a DigitalOcean Ubuntu server with Nginx → uvicorn reverse proxy.
 
 ## Hackathon highlights (for judges)
 - Uses FIBO’s JSON-native controls to guarantee deterministic framing, lighting, and composition—no prompt roulette.  
@@ -67,13 +65,9 @@ Environment variables (`.env`):
 The video demo walks through end-to-end: ingest script → detect characters/scenes → generate characters with FIBO → generate/refine shots via FIBO JSON → insert shots → agent-driven edits for quick tweaks while preserving consistency.
 
 ## Security & keys
-- Server keys live only in `/opt/ai_storyboard/.env` on the droplet (not in git).  
+- Server-side keys are stored securely on the host machine (never committed to git).
 - Client-supplied keys stay in the browser for that session and are not persisted server-side.  
 - “1” sentinel tells the backend to use the server’s .env keys.
-
-## Status checks
-- Health: `https://fibo.autoflujo.com/api/health`  
-- Frontend: `https://fibo.autoflujo.com/`
 
 ## Contributing
 Open a PR to `main`. Keep APIs stable, respect structured outputs, and avoid leaking secrets. Focus on production-ready UX, deterministic generation, and agent-guided refinements. 
