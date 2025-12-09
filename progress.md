@@ -1,3 +1,5 @@
+NOTE: Obviously Codex messed up the dates here. Everything was made from Novemeber 20 to December 7.
+
 ## 2024-05-29
 
 - **Completed:** Initialized FastAPI backend (`backend/app.py`) with health endpoint, CORS, and shared settings loader. Added project dependencies (`requirements.txt`), backend package init, and `.env` loading within `agent_tools.py` plus centralized config helper.
