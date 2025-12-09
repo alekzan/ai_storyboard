@@ -39,3 +39,6 @@ data_utilities.py
 # EXCEPTION: keep this one
 !agents_vertex_test.ipynbkeys/
 *.json
+AGENTS.md
+ROADMAP.md
+progress.md
